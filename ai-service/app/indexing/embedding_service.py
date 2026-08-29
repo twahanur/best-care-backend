@@ -104,14 +104,19 @@ async def get_embedding(text: str) -> List[float]:
     """
     if genai_client and settings.GEMINI_API_KEY:
         try:
-            response = genai_client.models.embed_content(
-                model=settings.EMBEDDING_MODEL,
-                contents=text,
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    genai_client.models.embed_content,
+                    model=settings.EMBEDDING_MODEL,
+                    contents=text,
+                    config=dict(output_dimensionality=settings.EMBEDDING_DIMENSION)
+                ),
+                timeout=4.0
             )
-            if response.embeddings and len(response.embeddings) > 0:
+            if response and response.embeddings and len(response.embeddings) > 0:
                 return response.embeddings[0].values
         except Exception as err:
-            print(f"[EmbeddingService] Gemini API error: {err}. Using multilingual fallback.")
+            pass  # Fall back to multilingual vector
             
     return generate_multilingual_fallback_vector(text, dim=settings.EMBEDDING_DIMENSION)
 

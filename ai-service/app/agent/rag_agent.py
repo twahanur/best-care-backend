@@ -132,24 +132,39 @@ class RAGAgent:
         user_prefs = await user_memory.get_user_preferences(user_id) if user_id else {}
         user_memory_str = "\n".join([f"- {k}: {v}" for k, v in user_prefs.items()]) if user_prefs else "No saved user preferences."
 
-        # 7. LLM Grounded Generation
+        # 7. LLM Grounded Generation with Multi-Model Cascading Fallback
         answer_text = ""
         system_prompt = SYSTEM_RAG_AGENT_PROMPT.format(
             context_str=context_str,
             history_str=history_str,
-            user_memory_str=user_memory_str
+            user_memory_str=""  # Purely session-scoped like ChatGPT
         )
 
         if genai_client and settings.GEMINI_API_KEY:
-            try:
-                response = genai_client.models.generate_content(
-                    model=settings.GEMINI_MODEL,
-                    contents=f"{system_prompt}\n\nCustomer Inquiry: {user_query}"
-                )
-                if response and response.text:
-                    answer_text = response.text
-            except Exception as err:
-                print(f"[RAGAgent] Gemini generation error: {err}. Using multilingual grounded fallback.")
+            models_to_try = [settings.GEMINI_MODEL]
+            if settings.GEMINI_FALLBACK_MODELS:
+                for fb_m in settings.GEMINI_FALLBACK_MODELS.split(","):
+                    fb_m_clean = fb_m.strip()
+                    if fb_m_clean and fb_m_clean not in models_to_try:
+                        models_to_try.append(fb_m_clean)
+
+            for model_name in models_to_try:
+                try:
+                    response = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            genai_client.models.generate_content,
+                            model=model_name,
+                            contents=f"{system_prompt}\n\nCustomer Inquiry: {user_query}"
+                        ),
+                        timeout=7.0
+                    )
+                    if response and response.text:
+                        answer_text = response.text
+                        break
+                except Exception as err:
+                    print(f"[RAGAgent] Model '{model_name}' unavailable or timed out ({err}). Cascading to next fallback...")
+
+            if not answer_text:
                 answer_text = cls._synthesize_grounded_offline_answer(user_query, final_docs, lang, history)
         else:
             answer_text = cls._synthesize_grounded_offline_answer(user_query, final_docs, lang, history)

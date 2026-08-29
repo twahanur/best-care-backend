@@ -12,15 +12,19 @@ class CanonicalBuilder:
         specs = v.get("specs", {})
         engine = specs.get("engine", "") if isinstance(specs, dict) else ""
         hp = specs.get("horsepower", "") if isinstance(specs, dict) else ""
+        v_name = f"{v.get('brand', '')} {v.get('name', '')}".strip() or v.get("title", "")
+        details = v.get("content", "")
+        meta = v.get("metadata", {})
         
         return (
-            f"Vehicle: {v.get('brand', '')} {v.get('name', '')}\n"
-            f"Category: {v.get('category', '')}\n"
-            f"Daily Rental Rate: ${v.get('dailyRate', 0)}/day\n"
-            f"Seating Capacity: {v.get('seats', 4)} passengers, {v.get('luggageCapacity', 2)} luggage capacity\n"
-            f"Transmission: {v.get('transmission', 'Automatic')}\n"
-            f"Fuel Type: {v.get('fuelType', 'Petrol')} ({v.get('fuelEfficiency', 'Standard')})\n"
-            f"Terrain & Road Capability: {v.get('terrainCapability', 'Paved roads')}\n"
+            f"Vehicle: {v_name}\n"
+            f"Category: {v.get('category', meta.get('category', 'Fleet Specs'))}\n"
+            f"Daily Rental Rate: ${v.get('dailyRate', meta.get('dailyRate', 0))}/day\n"
+            f"Seating Capacity: {v.get('seats', meta.get('seats', 5))} passengers\n"
+            f"Transmission: {v.get('transmission', meta.get('transmission', 'Automatic'))}\n"
+            f"Fuel Type: {v.get('fuelType', meta.get('fuelType', 'Petrol'))}\n"
+            f"Terrain & Road Capability: {v.get('terrainCapability', meta.get('terrain', 'All-Terrain / Highway'))}\n"
+            f"Vehicle Description & Equipment:\n{details}\n"
             f"Key Equipment & Features: {features_str}\n"
             f"Technical Specifications: Engine {engine}, {hp} HP\n"
             f"Current Availability: {'Available for immediate rental' if v.get('available', True) else 'Currently rented / unavailable'}"

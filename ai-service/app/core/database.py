@@ -6,6 +6,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.pool import NullPool
 from sqlalchemy import text
 from app.core.config import settings
 from app.core.models import Base
@@ -19,13 +20,11 @@ async def init_database_engine():
     
     db_url = settings.DATABASE_URL
     try:
-        # Attempt connecting to primary PostgreSQL engine
+        # Attempt connecting to primary PostgreSQL engine with NullPool
         test_engine = create_async_engine(
             db_url,
             echo=False,
-            pool_pre_ping=True,
-            pool_size=10,
-            max_overflow=20
+            poolclass=NullPool
         )
         async with test_engine.connect() as conn:
             # Enable pgvector extension in Postgres if available

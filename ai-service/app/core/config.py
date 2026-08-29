@@ -20,8 +20,12 @@ class Settings(BaseModel):
     
     # Google Gemini API Configuration
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
-    EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "text-embedding-004")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.7-flash")
+    GEMINI_FALLBACK_MODELS: str = os.getenv(
+        "GEMINI_FALLBACK_MODELS",
+        "gemini-3.6-flash,gemini-3.5-flash,gemini-flash-latest,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-lite-latest"
+    )
+    EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
     EMBEDDING_VERSION: str = "v1"
     EMBEDDING_DIMENSION: int = 256  # Fallback semantic dimension, 768 for Gemini text-embedding-004
     

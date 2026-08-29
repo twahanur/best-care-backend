@@ -11,7 +11,7 @@ from sqlalchemy.orm import declarative_base, relationship
 Base = declarative_base()
 
 def get_utc_now():
-    return datetime.now(timezone.utc)
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 class KnowledgeDocument(Base):
     __tablename__ = "rag_documents"
