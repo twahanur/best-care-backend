@@ -1,0 +1,51 @@
+name: Backend CI Pipeline
+
+on:
+  push:
+    branches: [main, dev, test, 'feat/*']
+  pull_request:
+    branches: [main, dev, test]
+
+jobs:
+  test-ai-service:
+    name: Test Python AI & RAG Microservice
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          cd ai-service
+          pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run Pytest Test Suite
+        run: |
+          cd ai-service
+          PYTHONPATH=. pytest -v
+
+  test-backend-gateway:
+    name: Test & Build NestJS Gateway
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: backend-gateway/package-lock.json
+      - name: Install Dependencies
+        run: |
+          cd backend-gateway
+          npm ci || npm install
+      - name: Run Unit Tests
+        run: |
+          cd backend-gateway
+          npm test
+      - name: Verify Build
+        run: |
+          cd backend-gateway
+          npm run build
