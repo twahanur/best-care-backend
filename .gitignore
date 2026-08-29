@@ -1,0 +1,1 @@
+node_modules\n.env\n__pycache__\n.venv\nvenv\ndist\n*.pyc\n.pytest_cache\n.coverage
