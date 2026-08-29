@@ -1,155 +1,136 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { Booking, BookingStatus, ProtectionPlan } from './booking.interface';
-import { CreateBookingDto } from './dto/create-booking.dto';
-import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Booking, BookingStatus, ProtectionPlan } from '../../common/types/schema.types';
+import { CarsService } from '../cars/cars.service';
+import { PaymentsService } from '../payments/payments.service';
 
 @Injectable()
 export class BookingsService {
+  constructor(
+    private readonly carsService: CarsService,
+    private readonly paymentsService: PaymentsService,
+  ) {}
+
   private bookings: Booking[] = [
     {
       id: 'bkg_1001',
-      bookingCode: 'DP-BK-78901',
-      vehicleId: 'car_prado_suv',
-      vehicleName: 'Toyota Land Cruiser Prado TX',
+      bookingCode: 'RC-BK-78901',
+      userId: 'usr_cust_1',
       customerName: 'Shahriar Khan',
-      customerEmail: 'shahriar.khan@apexholdings.com',
+      customerEmail: 'shahriar@example.com',
       customerPhone: '+8801819234567',
+      carId: 'car_jaguar_xe',
+      vehicleName: 'Jaguar XE L Prestige',
+      vehicleImage: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=800&q=80',
       pickupDate: '2026-08-28T09:00:00Z',
       dropoffDate: '2026-09-02T18:00:00Z',
-      pickupLocation: 'Dhaka Hazrat Shahjalal International Airport (DAC)',
-      dropoffLocation: 'Sylhet City Center Hub',
+      pickupLocation: 'Hazrat Shahjalal Intl Airport (DAC)',
+      dropoffLocation: 'Hazrat Shahjalal Intl Airport (DAC)',
       totalDays: 5,
-      dailyRate: 145,
+      dailyRate: 85,
+      baseAmount: 425,
       protectionPlan: 'Comprehensive Plus',
-      protectionFee: 90, // $18 * 5
-      totalAmount: 815,
+      protectionFee: 90,
+      securityDeposit: 250,
+      discountAmount: 0,
+      totalAmount: 515,
       status: 'Active',
       paymentStatus: 'Paid',
-      notes: 'Corporate client delegation trip to tea estates. VIP driver required.',
-      aiLeadScore: {
-        score: 92,
-        classification: 'Hot',
-        priority: 'High (Immediate 15-min SLA)',
-        suggestedAction: 'Assign dedicated account manager, send priority quote with VIP Full Shield upgrade.'
-      },
-      createdAt: '2026-08-27T14:30:00Z'
+      notes: 'Corporate client VIP airport pick-up.',
+      createdAt: '2026-08-27T14:30:00Z',
+      updatedAt: '2026-08-27T14:30:00Z'
     },
     {
       id: 'bkg_1002',
-      bookingCode: 'DP-BK-78902',
-      vehicleId: 'car_mercedes_eclass',
-      vehicleName: 'Mercedes-Benz E-Class AMG Line',
+      bookingCode: 'RC-BK-78902',
+      userId: 'usr_cust_2',
       customerName: 'Nusrat Jahan',
-      customerEmail: 'nusrat.jahan@unilever.bd',
+      customerEmail: 'nusrat@example.com',
       customerPhone: '+8801711987654',
+      carId: 'car_audi_a6',
+      vehicleName: 'Audi A6 Business Executive',
+      vehicleImage: 'https://images.unsplash.com/photo-1603584173870-7f23fdae1b7a?auto=format&fit=crop&w=800&q=80',
       pickupDate: '2026-08-30T10:00:00Z',
       dropoffDate: '2026-09-01T20:00:00Z',
       pickupLocation: 'Gulshan Diplomatic Zone, Dhaka',
-      dropoffLocation: 'Dhaka Hazrat Shahjalal International Airport (DAC)',
+      dropoffLocation: 'Hazrat Shahjalal Intl Airport (DAC)',
       totalDays: 2,
-      dailyRate: 160,
+      dailyRate: 95,
+      baseAmount: 190,
       protectionPlan: 'VIP Full Shield',
-      protectionFee: 60, // $30 * 2
-      totalAmount: 380,
+      protectionFee: 60,
+      securityDeposit: 300,
+      discountAmount: 0,
+      totalAmount: 250,
       status: 'Confirmed',
       paymentStatus: 'Paid',
       notes: 'VIP Airport transfer for regional managing director.',
-      aiLeadScore: {
-        score: 88,
-        classification: 'Hot',
-        priority: 'High (Immediate 15-min SLA)',
-        suggestedAction: 'Executive chauffeur pre-assigned with vehicle detailing inspection.'
-      },
-      createdAt: '2026-08-28T09:15:00Z'
+      createdAt: '2026-08-28T09:15:00Z',
+      updatedAt: '2026-08-28T09:15:00Z'
     },
     {
       id: 'bkg_1003',
-      bookingCode: 'DP-BK-78903',
-      vehicleId: 'car_tesla_modely',
-      vehicleName: 'Tesla Model Y Long Range',
-      customerName: 'Farhan Chowdhury',
-      customerEmail: 'farhan.tech@gmail.com',
+      bookingCode: 'RC-BK-78903',
+      userId: 'usr_cust_1',
+      customerName: 'Shahriar Khan',
+      customerEmail: 'shahriar@example.com',
       customerPhone: '+8801912345678',
+      carId: 'car_tesla_modely',
+      vehicleName: 'Tesla Model Y Long Range',
+      vehicleImage: 'https://images.unsplash.com/photo-1617788138017-80ad40651399?auto=format&fit=crop&w=800&q=80',
       pickupDate: '2026-09-03T08:00:00Z',
       dropoffDate: '2026-09-07T18:00:00Z',
       pickupLocation: 'Banani Central Hub',
       dropoffLocation: 'Banani Central Hub',
       totalDays: 4,
       dailyRate: 110,
+      baseAmount: 440,
       protectionPlan: 'Basic CDW',
       protectionFee: 0,
+      securityDeposit: 300,
+      discountAmount: 0,
       totalAmount: 440,
       status: 'Pending',
       paymentStatus: 'Pending',
       notes: 'Family weekend eco tour along Padma Expressway.',
-      aiLeadScore: {
-        score: 68,
-        classification: 'Warm',
-        priority: 'Medium (Within 2 hours)',
-        suggestedAction: 'Send automated booking confirmation email with vehicle spec sheet.'
-      },
-      createdAt: '2026-08-28T16:45:00Z'
+      createdAt: '2026-08-28T16:45:00Z',
+      updatedAt: '2026-08-28T16:45:00Z'
     },
     {
       id: 'bkg_1004',
-      bookingCode: 'DP-BK-78904',
-      vehicleId: 'car_camry_hybrid',
-      vehicleName: 'Toyota Camry Premium Hybrid',
-      customerName: 'Anisur Rahman',
-      customerEmail: 'anisur.r@standardbank.com',
-      customerPhone: '+8801612345678',
-      pickupDate: '2026-08-20T08:00:00Z',
-      dropoffDate: '2026-08-24T18:00:00Z',
-      pickupLocation: 'Motijheel Commercial Area',
-      dropoffLocation: 'Chittagong Port City Hub',
-      totalDays: 4,
-      dailyRate: 70,
+      bookingCode: 'RC-BK-78904',
+      userId: 'usr_cust_1',
+      customerName: 'Shahriar Khan',
+      customerEmail: 'shahriar@example.com',
+      customerPhone: '+8801819234567',
+      carId: 'car_hyundai_tucson',
+      vehicleName: 'Hyundai Tucson Limited Edition',
+      vehicleImage: 'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&w=800&q=80',
+      pickupDate: '2026-08-15T08:00:00Z',
+      dropoffDate: '2026-08-18T18:00:00Z',
+      pickupLocation: 'Gulshan Diplomatic Zone, Dhaka',
+      dropoffLocation: 'Gulshan Diplomatic Zone, Dhaka',
+      totalDays: 3,
+      dailyRate: 75,
+      baseAmount: 225,
       protectionPlan: 'Comprehensive Plus',
-      protectionFee: 72,
-      totalAmount: 352,
+      protectionFee: 54,
+      securityDeposit: 200,
+      discountAmount: 0,
+      totalAmount: 279,
       status: 'Completed',
       paymentStatus: 'Paid',
-      notes: 'Inter-city branch audit commute.',
-      aiLeadScore: {
-        score: 74,
-        classification: 'Warm',
-        priority: 'Medium',
-        suggestedAction: 'Send customer feedback survey and loyalty discount.'
-      },
-      createdAt: '2026-08-19T11:20:00Z'
-    },
-    {
-      id: 'bkg_1005',
-      bookingCode: 'DP-BK-78905',
-      vehicleId: 'car_mustang_gt',
-      vehicleName: 'Ford Mustang GT V8 Convertible',
-      customerName: 'Arman Latif',
-      customerEmail: 'arman.l@creativepulse.io',
-      customerPhone: '+8801512345678',
-      pickupDate: '2026-08-29T10:00:00Z',
-      dropoffDate: '2026-08-31T18:00:00Z',
-      pickupLocation: 'Dhanmondi Hub',
-      dropoffLocation: 'Coxs Bazar Beach Hub',
-      totalDays: 2,
-      dailyRate: 175,
-      protectionPlan: 'VIP Full Shield',
-      protectionFee: 60,
-      totalAmount: 410,
-      status: 'Active',
-      paymentStatus: 'Paid',
-      notes: 'Scenic photoshoot & weekend tour.',
-      aiLeadScore: {
-        score: 85,
-        classification: 'Hot',
-        priority: 'High',
-        suggestedAction: 'Pre-authorize deposit and verify sport driving agreement.'
-      },
-      createdAt: '2026-08-28T18:00:00Z'
+      notes: 'Weekend client meeting commute.',
+      createdAt: '2026-08-14T11:20:00Z',
+      updatedAt: '2026-08-14T11:20:00Z'
     }
   ];
 
-  findAll(status?: string, search?: string): Booking[] {
+  findAll(status?: string, search?: string, userId?: string): Booking[] {
     let result = [...this.bookings];
+
+    if (userId) {
+      result = result.filter(b => b.userId === userId);
+    }
 
     if (status && status !== 'All') {
       result = result.filter(b => b.status.toLowerCase() === status.toLowerCase());
@@ -176,60 +157,137 @@ export class BookingsService {
     return booking;
   }
 
-  create(dto: CreateBookingDto, aiLeadScore?: any): Booking {
+  create(dto: any, aiLeadScore?: any): Booking {
     const id = `bkg_${Date.now()}`;
-    const randomCodeSuffix = Math.floor(10000 + Math.random() * 90000);
-    const bookingCode = `DP-BK-${randomCodeSuffix}`;
+    const randomCode = `RC-BK-${Math.floor(10000 + Math.random() * 90000)}`;
 
-    const plan = dto.protectionPlan || 'Basic CDW';
+    const carId = dto.carId || dto.vehicleId || 'car_jaguar_xe';
+    let carImage = dto.vehicleImage;
+    let carName = dto.vehicleName;
+    let dailyRate = Number(dto.dailyRate) || 85;
+
+    try {
+      const car = this.carsService.findOne(carId);
+      carName = car.name;
+      carImage = car.images[0];
+      dailyRate = car.dailyRate;
+    } catch {
+      // fallback
+    }
+
+    const totalDays = Math.max(1, Number(dto.totalDays) || 1);
+    const plan: ProtectionPlan = dto.protectionPlan || 'Comprehensive Plus';
     let dailyProtectionFee = 0;
     if (plan === 'Comprehensive Plus') dailyProtectionFee = 18;
     else if (plan === 'VIP Full Shield') dailyProtectionFee = 30;
 
-    const protectionFee = dailyProtectionFee * dto.totalDays;
-    const totalAmount = (dto.dailyRate * dto.totalDays) + protectionFee;
+    const protectionFee = dailyProtectionFee * totalDays;
+    const baseAmount = dailyRate * totalDays;
+    const totalAmount = baseAmount + protectionFee;
 
     const newBooking: Booking = {
       id,
-      bookingCode,
-      vehicleId: dto.vehicleId,
-      vehicleName: dto.vehicleName,
-      customerName: dto.customerName,
-      customerEmail: dto.customerEmail,
-      customerPhone: dto.customerPhone,
+      bookingCode: randomCode,
+      userId: dto.userId || 'usr_cust_1',
+      customerName: dto.customerName || 'Customer',
+      customerEmail: dto.customerEmail || 'customer@example.com',
+      customerPhone: dto.customerPhone || '+8801700000000',
+      carId,
+      vehicleName: carName,
+      vehicleImage: carImage,
       pickupDate: dto.pickupDate,
       dropoffDate: dto.dropoffDate,
-      pickupLocation: dto.pickupLocation,
-      dropoffLocation: dto.dropoffLocation,
-      totalDays: dto.totalDays,
-      dailyRate: dto.dailyRate,
+      pickupLocation: dto.pickupLocation || 'Hazrat Shahjalal Intl Airport (DAC)',
+      dropoffLocation: dto.dropoffLocation || 'Hazrat Shahjalal Intl Airport (DAC)',
+      totalDays,
+      dailyRate,
+      baseAmount,
       protectionPlan: plan,
       protectionFee,
+      securityDeposit: dto.securityDeposit || 200,
+      discountAmount: 0,
       totalAmount,
       status: 'Confirmed',
       paymentStatus: 'Paid',
       notes: dto.notes || '',
       aiLeadScore: aiLeadScore || {
-        score: 75,
-        classification: 'Warm',
-        priority: 'Medium (Within 2 hours)',
-        suggestedAction: 'Send automated confirmation and vehicle check-in guide.'
+        score: 82,
+        classification: 'Hot',
+        priority: 'High (Immediate 15-min SLA)',
+        suggestedAction: 'Send automated confirmation pass and assign vehicle inspection.'
       },
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
     this.bookings.unshift(newBooking);
+
+    // Auto-record completed payment
+    this.paymentsService.create({
+      bookingId: newBooking.id,
+      bookingCode: newBooking.bookingCode,
+      userId: newBooking.userId,
+      customerName: newBooking.customerName,
+      amount: newBooking.totalAmount,
+      paymentMethod: dto.paymentMethod || 'Credit Card'
+    });
+
     return newBooking;
   }
 
-  updateStatus(id: string, dto: UpdateBookingStatusDto): Booking {
+  updateStatus(id: string, newStatus: BookingStatus): Booking {
     const booking = this.findOne(id);
-    booking.status = dto.status;
+    booking.status = newStatus;
+    booking.updatedAt = new Date().toISOString();
+
+    if (newStatus === 'Active') {
+      this.carsService.updateCarStatus(booking.carId, 'RENTED');
+    } else if (newStatus === 'Completed' || newStatus === 'Cancelled') {
+      this.carsService.updateCarStatus(booking.carId, 'AVAILABLE');
+    }
+
+    return booking;
+  }
+
+  cancelBooking(id: string, reason: string): Booking {
+    const booking = this.findOne(id);
+    if (booking.status === 'Completed' || booking.status === 'Cancelled') {
+      throw new BadRequestException(`Cannot cancel a booking that is already ${booking.status}.`);
+    }
+
+    booking.status = 'Cancelled';
+    booking.cancellationReason = reason || 'Customer requested free cancellation.';
+    booking.cancelledAt = new Date().toISOString();
+    booking.refundAmount = booking.totalAmount;
+    booking.paymentStatus = 'Refunded';
+    booking.updatedAt = new Date().toISOString();
+
+    // Release vehicle & process payment refund
+    this.carsService.updateCarStatus(booking.carId, 'AVAILABLE');
+    this.paymentsService.refund(booking.id, reason);
+
     return booking;
   }
 
   getRecentBookings(limit: number = 5): Booking[] {
     return this.bookings.slice(0, limit);
+  }
+
+  getMetrics() {
+
+    const totalBookings = this.bookings.length;
+    const activeRentals = this.bookings.filter(b => b.status === 'Active').length;
+    const totalRevenue = this.bookings
+      .filter(b => b.status !== 'Cancelled')
+      .reduce((sum, b) => sum + b.totalAmount, 0);
+
+    return {
+      totalBookings,
+      activeRentals,
+      totalRevenue,
+      revenueGrowthPct: 15.8,
+      fleetUtilizationRate: 88,
+    };
   }
 
   getAllBookingsRaw(): Booking[] {

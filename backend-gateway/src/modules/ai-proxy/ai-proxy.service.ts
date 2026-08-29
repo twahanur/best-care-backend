@@ -21,7 +21,7 @@ export class AiProxyService {
           session_id: dto.sessionId,
           user_id: dto.userId,
           category: dto.category
-        }, { timeout: 10000 })
+        }, { timeout: 30000 })
       );
       return response.data;
     } catch (error) {

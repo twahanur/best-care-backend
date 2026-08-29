@@ -1,17 +1,27 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { VehiclesModule } from './modules/vehicles/vehicles.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { CarsModule } from './modules/cars/cars.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
-import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
+import { AvailabilityModule } from './modules/availability/availability.module';
+import { PricingModule } from './modules/pricing/pricing.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { AiProxyModule } from './modules/ai-proxy/ai-proxy.module';
 import { AutomationModule } from './modules/automation/automation.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    VehiclesModule,
+    AuthModule,
+    CarsModule,
     BookingsModule,
-    AnalyticsModule,
+    PaymentsModule,
+    ReviewsModule,
+    AvailabilityModule,
+    PricingModule,
+    ReportsModule,
     AiProxyModule,
     AutomationModule
   ]

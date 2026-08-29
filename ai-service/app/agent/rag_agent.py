@@ -157,7 +157,7 @@ class RAGAgent:
                             model=model_name,
                             contents=f"{system_prompt}\n\nCustomer Inquiry: {user_query}"
                         ),
-                        timeout=7.0
+                        timeout=4.0
                     )
                     if response and response.text:
                         answer_text = response.text

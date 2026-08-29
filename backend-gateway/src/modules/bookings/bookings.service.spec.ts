@@ -45,7 +45,8 @@ describe('BookingsService', () => {
   });
 
   it('should update booking status', () => {
-    const updated = service.updateStatus('bkg_1003', { status: 'Confirmed' });
+    const updated = service.updateStatus('bkg_1003', 'Confirmed');
     expect(updated.status).toBe('Confirmed');
   });
 });
+

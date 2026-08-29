@@ -1,40 +1,44 @@
-import { Controller, Get, Post, Body, Param, Query, Patch } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Post, Put, Body, Param, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { BookingsService } from './bookings.service';
-import { CreateBookingDto } from './dto/create-booking.dto';
-import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
+import { BookingStatus } from '../../common/types/schema.types';
 
-@ApiTags('Bookings')
+@ApiTags('Bookings & Reservations')
 @Controller('bookings')
 export class BookingsController {
   constructor(private readonly bookingsService: BookingsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List and filter customer bookings' })
-  @ApiQuery({ name: 'status', required: false, description: 'Filter by booking status' })
-  @ApiQuery({ name: 'search', required: false, description: 'Search by code, customer name or email' })
-  findAll(@Query('status') status?: string, @Query('search') search?: string) {
-    return this.bookingsService.findAll(status, search);
+  @ApiOperation({ summary: 'Get all bookings with optional status, user, and search filters' })
+  findAll(
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('userId') userId?: string,
+  ) {
+    return this.bookingsService.findAll(status, search, userId);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get booking details by ID or Booking Code' })
-  @ApiResponse({ status: 200, description: 'Booking record' })
-  @ApiResponse({ status: 404, description: 'Booking not found' })
+  @ApiOperation({ summary: 'Get booking details by ID or code' })
   findOne(@Param('id') id: string) {
     return this.bookingsService.findOne(id);
   }
 
   @Post()
-  @ApiOperation({ summary: 'Create a new car rental booking' })
-  @ApiResponse({ status: 201, description: 'Booking successfully confirmed' })
-  create(@Body() dto: CreateBookingDto) {
-    return this.bookingsService.create(dto);
+  @ApiOperation({ summary: 'Create a new car rental reservation' })
+  create(@Body() body: any) {
+    return this.bookingsService.create(body);
   }
 
-  @Patch(':id/status')
-  @ApiOperation({ summary: 'Update booking status (Admin)' })
-  updateStatus(@Param('id') id: string, @Body() dto: UpdateBookingStatusDto) {
-    return this.bookingsService.updateStatus(id, dto);
+  @Put(':id/status')
+  @ApiOperation({ summary: 'Update booking status lifecycle' })
+  updateStatus(@Param('id') id: string, @Body() body: { status: BookingStatus }) {
+    return this.bookingsService.updateStatus(id, body.status);
+  }
+
+  @Post(':id/cancel')
+  @ApiOperation({ summary: 'Cancel booking and process full refund' })
+  cancelBooking(@Param('id') id: string, @Body() body: { reason: string }) {
+    return this.bookingsService.cancelBooking(id, body?.reason);
   }
 }
