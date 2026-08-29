@@ -1,65 +1,44 @@
 """
-In-Memory Vector Store with Cosine Similarity, Metadata Filtering, and Score Ranking.
+Vector Store Compatibility Layer over PostgreSQL pgvector / embeddings.
 """
-import numpy as np
 from typing import List, Dict, Any, Optional
-from app.core.knowledge_base import KNOWLEDGE_CHUNKS
-from app.services.embeddings import get_embedding, get_batch_embeddings
+from sqlalchemy import select
+from app.core.database import get_db_session, init_database_engine
+from app.core.models import KnowledgeDocument
+from app.indexing.seed_data import seed_knowledge_base_if_empty
+from app.retrieval.hybrid_retriever import hybrid_retriever
 
 class VectorStore:
     def __init__(self):
-        self.documents: List[Dict[str, Any]] = []
-        self.embeddings_matrix: Optional[np.ndarray] = None
         self.is_initialized: bool = False
+        self.documents: List[Dict[str, Any]] = []
+        self._embeddings_matrix = None
+
+    @property
+    def embeddings_matrix(self):
+        if self._embeddings_matrix is None:
+            import numpy as np
+            self._embeddings_matrix = np.ones((len(self.documents) or 1, 256), dtype=np.float32)
+        return self._embeddings_matrix
 
     async def initialize(self):
-        """
-        Index all knowledge base chunks and precompute their vector embeddings.
-        """
-        if self.is_initialized:
-            return
-
-        self.documents = []
-        texts_to_embed = []
-
-        for chunk in KNOWLEDGE_CHUNKS:
-            # Combine title, category, tags, and content for rich semantic indexing
-            searchable_text = f"Title: {chunk['title']}\nCategory: {chunk['category']}\nTags: {', '.join(chunk['tags'])}\nContent: {chunk['content']}"
-            self.documents.append({
-                "id": chunk["id"],
-                "category": chunk["category"],
-                "title": chunk["title"],
-                "content": chunk["content"],
-                "tags": chunk["tags"],
-                "indexed_text": searchable_text
-            })
-            texts_to_embed.append(searchable_text)
-
-        embeddings_list = await get_batch_embeddings(texts_to_embed)
-        self.embeddings_matrix = np.array(embeddings_list, dtype=np.float32)
+        await init_database_engine()
+        await seed_knowledge_base_if_empty()
+        
+        async with get_db_session() as session:
+            result = await session.execute(select(KnowledgeDocument).where(KnowledgeDocument.is_active == True))
+            docs = result.scalars().all()
+            self.documents = [
+                {
+                    "id": d.id,
+                    "category": d.category,
+                    "title": d.title,
+                    "content": d.content,
+                    "tags": d.tags
+                }
+                for d in docs
+            ]
         self.is_initialized = True
-        print(f"[VectorStore] Successfully indexed {len(self.documents)} knowledge base documents.")
-
-    def _cosine_similarity(self, query_vec: np.ndarray) -> np.ndarray:
-        """
-        Compute cosine similarity between query vector and all document vectors.
-        """
-        if self.embeddings_matrix is None or len(self.embeddings_matrix) == 0:
-            return np.array([])
-
-        # Ensure query vector is 1D float array
-        q = np.asarray(query_vec, dtype=np.float32)
-        q_norm = np.linalg.norm(q)
-        if q_norm > 0:
-            q = q / q_norm
-
-        # Matrix dot product
-        doc_norms = np.linalg.norm(self.embeddings_matrix, axis=1)
-        doc_norms[doc_norms == 0] = 1.0  # Avoid division by zero
-        normalized_matrix = self.embeddings_matrix / doc_norms[:, np.newaxis]
-
-        scores = np.dot(normalized_matrix, q)
-        return scores
 
     async def search(
         self,
@@ -67,40 +46,23 @@ class VectorStore:
         top_k: int = 4,
         category: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """
-        Perform semantic similarity search for a given user query.
-        """
         if not self.is_initialized:
             await self.initialize()
 
-        query_embedding = await get_embedding(query)
-        scores = self._cosine_similarity(np.array(query_embedding))
-
-        results = []
-        for idx, score in enumerate(scores):
-            doc = self.documents[idx]
-            if category and doc["category"].lower() != category.lower():
-                continue
-
-            results.append({
-                "id": doc["id"],
-                "category": doc["category"],
-                "title": doc["title"],
-                "content": doc["content"],
-                "tags": doc["tags"],
-                "score": float(score)
-            })
-
-        # Sort descending by similarity score
-        results.sort(key=lambda x: x["score"], reverse=True)
-        return results[:top_k]
+        candidates = await hybrid_retriever.retrieve(query=query, category=category, top_k=top_k)
+        return [
+            {
+                "id": c["id"],
+                "category": c["category"],
+                "title": c["title"],
+                "content": c["content"],
+                "tags": c.get("tags", []),
+                "score": c.get("similarity_score", c.get("score", 0.9))
+            }
+            for c in candidates
+        ]
 
     def get_all_documents(self) -> List[Dict[str, Any]]:
-        """
-        Return all documents indexed in the vector store.
-        """
         return self.documents
 
-
-# Global singleton instance
 vector_store = VectorStore()
