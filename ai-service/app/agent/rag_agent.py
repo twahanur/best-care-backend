@@ -4,6 +4,7 @@ Orchestrates multi-turn conversation memory, intent extraction, hybrid retrieval
 reranking, evidence grounding, and multilingual response generation.
 """
 import re
+import asyncio
 from typing import Dict, Any, List, Optional
 from app.core.config import settings
 from app.query.language_detector import language_detector

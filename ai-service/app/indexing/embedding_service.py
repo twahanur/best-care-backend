@@ -3,6 +3,7 @@ Multilingual Embedding Service with Google Gemini text-embedding-004 and Resilie
 Handles English, Bengali (বাংলা), and Banglish (phonetic Latin Bangla) semantics.
 """
 import re
+import asyncio
 import numpy as np
 from typing import List
 from app.core.config import settings
