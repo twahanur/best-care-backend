@@ -38,7 +38,7 @@ export class AiProxyService {
       const response = await firstValueFrom(
         this.httpService.post(`${this.aiServiceUrl}/rag/chat`, payload, {
           headers,
-          timeout: 30000
+          timeout: 60000
         })
       );
       const d = response.data;
