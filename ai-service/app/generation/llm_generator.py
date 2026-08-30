@@ -4,12 +4,16 @@ from app.core.config import settings
 from app.generation.prompt_templates import SYSTEM_RAG_AGENT_PROMPT
 
 genai_client = None
-if settings.GEMINI_API_KEY:
-    try:
-        from google import genai
-        genai_client = genai.Client(api_key=settings.GEMINI_API_KEY)
-    except Exception as e:
-        print(f"[LLMGenerator] Gemini client notice: {e}. Using resilient grounded synthesizer.")
+
+def get_genai_client():
+    global genai_client
+    if genai_client is None and settings.GEMINI_API_KEY:
+        try:
+            from google import genai
+            genai_client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        except Exception as e:
+            print(f"[LLMGenerator] Gemini client notice: {e}")
+    return genai_client
 
 class LLMGenerator:
     @classmethod
@@ -33,21 +37,23 @@ class LLMGenerator:
         )
 
         # 1. Try Gemini Models with Multi-Model Fallback Cascade
-        if genai_client and settings.GEMINI_API_KEY:
+        client = get_genai_client()
+        if client and settings.GEMINI_API_KEY:
             model_candidates = [settings.GEMINI_MODEL] + settings.fallback_model_list
             for model_name in model_candidates:
                 try:
                     response = await asyncio.wait_for(
                         asyncio.to_thread(
-                            genai_client.models.generate_content,
+                            client.models.generate_content,
                             model=model_name,
                             contents=prompt
                         ),
-                        timeout=5.0
+                        timeout=12.0
                     )
                     if response and response.text:
                         return response.text.strip()
-                except Exception:
+                except Exception as ex:
+                    print(f"[LLMGenerator] Model {model_name} failed: {ex}")
                     continue
 
         # 2. Resilient Deterministic Grounded Synthesis Fallback

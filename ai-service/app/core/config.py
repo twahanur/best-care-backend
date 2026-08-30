@@ -21,10 +21,10 @@ class Settings(BaseSettings):
 
     # Google Gemini GenAI Settings
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
     GEMINI_FALLBACK_MODELS: str = os.getenv(
         "GEMINI_FALLBACK_MODELS",
-        "gemini-2.0-flash,gemini-1.5-flash,gemini-1.5-flash-8b,gemini-2.0-flash-exp"
+        "gemini-3.6-flash,gemini-3.5-flash,gemini-3.7-flash,gemini-3.1-flash-lite,gemini-flash-latest"
     )
     EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
     EMBEDDING_DIMENSION: int = 768
