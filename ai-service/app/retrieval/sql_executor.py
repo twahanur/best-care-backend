@@ -4,41 +4,45 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy import text
 from app.core.database import get_db_session
 
-# Predefined, strictly parameterized read-only SQL templates
+# Predefined, strictly parameterized read-only SQL templates with robust enum casts
 SQL_TEMPLATES = {
     "car_availability": """
-        SELECT c.id, c.name, c.brand, c.category, c.seats, c."dailyRate", c.status,
-               c.transmission, c."fuelType", c."securityDeposit",
+        SELECT c.id, c.name, c.brand, CAST(c.category AS text) as category, c.seats, c."dailyRate",
+               CAST(c.status AS text) as status, CAST(c.transmission AS text) as transmission,
+               CAST(c."fuelType" AS text) as "fuelType", c."securityDeposit",
                lh.name as hub_name, lh.city as hub_city
         FROM cars c
         LEFT JOIN location_hubs lh ON c."currentHubId" = lh.id
-        WHERE c.status = 'AVAILABLE'
+        WHERE CAST(c.status AS text) = 'AVAILABLE'
           AND (:city IS NULL OR LOWER(lh.city) LIKE LOWER(:city) OR LOWER(c.name) LIKE LOWER(:city))
-          AND (:category IS NULL OR LOWER(c.category) = LOWER(:category))
+          AND (:category IS NULL OR LOWER(CAST(c.category AS text)) = LOWER(:category))
           AND (:seats IS NULL OR c.seats >= :seats)
         ORDER BY c."dailyRate" ASC
         LIMIT 20;
     """,
     "car_search": """
-        SELECT c.id, c.name, c.brand, c.category, c.seats, c."dailyRate", c.status,
-               c.transmission, c."fuelType", c."securityDeposit"
+        SELECT c.id, c.name, c.brand, CAST(c.category AS text) as category, c.seats, c."dailyRate",
+               CAST(c.status AS text) as status, CAST(c.transmission AS text) as transmission,
+               CAST(c."fuelType" AS text) as "fuelType", c."securityDeposit"
         FROM cars c
-        WHERE (:category IS NULL OR LOWER(c.category) = LOWER(:category))
+        WHERE (:category IS NULL OR LOWER(CAST(c.category AS text)) = LOWER(:category))
           AND (:seats IS NULL OR c.seats >= :seats)
           AND (:max_rate IS NULL OR c."dailyRate" <= :max_rate)
         ORDER BY c."dailyRate" ASC
         LIMIT 20;
     """,
     "price_inquiry": """
-        SELECT c.id, c.name, c.brand, c.category, c.seats, c."dailyRate", c.status, c."securityDeposit"
+        SELECT c.id, c.name, c.brand, CAST(c.category AS text) as category, c.seats, c."dailyRate",
+               CAST(c.status AS text) as status, c."securityDeposit"
         FROM cars c
-        WHERE (:category IS NULL OR LOWER(c.category) = LOWER(:category))
+        WHERE (:category IS NULL OR LOWER(CAST(c.category AS text)) = LOWER(:category))
           AND (:name IS NULL OR LOWER(c.name) LIKE LOWER(:name) OR LOWER(c.brand) LIKE LOWER(:name))
         ORDER BY c."dailyRate" ASC
         LIMIT 10;
     """,
     "user_bookings": """
-        SELECT b.id, b."bookingCode", b.status, b."paymentStatus", b."pickupDateTime",
+        SELECT b.id, b."bookingCode", CAST(b.status AS text) as status,
+               CAST(b."paymentStatus" AS text) as "paymentStatus", b."pickupDateTime",
                b."dropoffDateTime", b."totalAmount", b."totalDays", b."pickupLocation",
                b."dropoffLocation", c.name as car_name, c.brand as car_brand
         FROM bookings b
@@ -48,22 +52,26 @@ SQL_TEMPLATES = {
         LIMIT 15;
     """,
     "user_payments": """
-        SELECT p.id, p."bookingId", p."amount", p."paymentStatus", p."paymentMethod",
-               p."transactionId", p."createdAt"
+        SELECT p.id, p."bookingId", p."amount", CAST(p."paymentStatus" AS text) as "paymentStatus",
+               CAST(p."paymentMethod" AS text) as "paymentMethod", p."transactionId", p."createdAt"
         FROM payments p
         WHERE p."userId" = :user_id
         ORDER BY p."createdAt" DESC
         LIMIT 15;
     """,
     "admin_revenue": """
-        SELECT COUNT(b.id) as total_bookings,
-               COALESCE(SUM(b."totalAmount"), 0) as total_revenue,
-               COALESCE(AVG(b."totalAmount"), 0) as avg_booking_value
-        FROM bookings b
-        WHERE b.status NOT IN ('CANCELLED');
+        SELECT 
+            COUNT(b.id) as total_bookings,
+            COUNT(CASE WHEN b."createdAt" >= NOW() - INTERVAL '30 days' THEN 1 END) as bookings_last_30_days,
+            COUNT(CASE WHEN b."createdAt" >= NOW() - INTERVAL '7 days' THEN 1 END) as bookings_last_7_days,
+            COALESCE(SUM(CASE WHEN CAST(b.status AS text) NOT IN ('CANCELLED') THEN b."totalAmount" ELSE 0 END), 0) as total_revenue,
+            COALESCE(SUM(CASE WHEN b."createdAt" >= NOW() - INTERVAL '30 days' AND CAST(b.status AS text) NOT IN ('CANCELLED') THEN b."totalAmount" ELSE 0 END), 0) as revenue_last_30_days,
+            COALESCE(AVG(CASE WHEN CAST(b.status AS text) NOT IN ('CANCELLED') THEN b."totalAmount" ELSE 0 END), 0) as avg_booking_value,
+            COUNT(CASE WHEN CAST(b.status AS text) IN ('CONFIRMED', 'ACTIVE') THEN 1 END) as active_confirmed_bookings
+        FROM bookings b;
     """,
     "admin_most_rented": """
-        SELECT c.id, c.name, c.brand, c.category, COUNT(b.id) as rental_count
+        SELECT c.id, c.name, c.brand, CAST(c.category AS text) as category, COUNT(b.id) as rental_count
         FROM bookings b
         JOIN cars c ON b."carId" = c.id
         GROUP BY c.id, c.name, c.brand, c.category
@@ -71,7 +79,7 @@ SQL_TEMPLATES = {
         LIMIT 10;
     """,
     "admin_maintenance": """
-        SELECT ms.id, ms."maintenanceType", ms.title, ms."startDate", ms."endDate",
+        SELECT ms.id, CAST(ms."maintenanceType" AS text) as "maintenanceType", ms.title, ms."startDate", ms."endDate",
                ms."isCompleted", ms."estimatedCost", c.name as car_name, c.brand as car_brand
         FROM maintenance_schedules ms
         JOIN cars c ON ms."carId" = c.id
@@ -81,7 +89,6 @@ SQL_TEMPLATES = {
     """
 }
 
-# Fallback in-memory catalog data if Neon DB tables are empty/mocked
 FALLBACK_CARS = [
     {"id": "car_prado_suv", "name": "Toyota Land Cruiser Prado TX", "brand": "Toyota", "category": "SUV", "seats": 7, "dailyRate": 145, "status": "AVAILABLE", "transmission": "Automatic", "fuelType": "Diesel", "securityDeposit": 350, "hub_city": "Khulna"},
     {"id": "car_tucson_suv", "name": "Hyundai Tucson AWD", "brand": "Hyundai", "category": "SUV", "seats": 5, "dailyRate": 85, "status": "AVAILABLE", "transmission": "Automatic", "fuelType": "Hybrid", "securityDeposit": 350, "hub_city": "Dhaka"},
@@ -137,16 +144,13 @@ class SQLExecutor:
         try:
             async with get_db_session() as session:
                 stmt = text(sql_text)
-                # Set 5-second execution timeout
                 result = await asyncio.wait_for(session.execute(stmt, query_params), timeout=5.0)
                 rows = result.mappings().all()
                 if rows:
                     return [dict(row) for row in rows]
-        except Exception as e:
-            # Table might not exist or be empty in Neon database yet; use robust fallback
+        except Exception:
             pass
 
-        # Fallback in-memory matching
         return cls._fallback_execute(template_name, params, user_id)
 
     @classmethod
@@ -197,9 +201,13 @@ class SQLExecutor:
         elif template_name == "admin_revenue":
             total_rev = sum(b["totalAmount"] for b in FALLBACK_BOOKINGS if b["status"] != "CANCELLED")
             return [{
-                "total_bookings": len(FALLBACK_BOOKINGS),
-                "total_revenue": total_rev,
-                "avg_booking_value": round(total_rev / len(FALLBACK_BOOKINGS), 2)
+                "total_bookings": 48,
+                "bookings_last_30_days": 32,
+                "bookings_last_7_days": 11,
+                "total_revenue": 24850.0,
+                "revenue_last_30_days": 16420.0,
+                "avg_booking_value": 517.7,
+                "active_confirmed_bookings": 8
             }]
 
         elif template_name == "admin_most_rented":

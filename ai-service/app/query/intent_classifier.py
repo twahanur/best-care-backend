@@ -23,14 +23,17 @@ class IntentClassifier:
            re.search(r"\b(suv\s*book|sedan\s*book|prado\s*book|tucson\s*book|hiace\s*book|camry\s*book|tesla\s*book)\b", q):
             return "booking_create"
 
-        # 3. Admin Analytics Queries (Role-Gated or Explicit Analytics)
-        if user_role == "ADMIN" or "admin" in q:
-            if re.search(r"\b(revenue|income|earning|taka|mot\s*taka|total\s*revenue|sales)\b", q):
-                return "admin_revenue"
-            if re.search(r"\b(most\s*rented|popular|bestselling|top\s*car|beshi\s*rent)\b", q):
-                return "admin_most_rented"
-            if re.search(r"\b(maintenance|servicing|reparation|repair|problem)\b", q):
-                return "admin_maintenance"
+        # 3. Analytics & Operational Metrics Queries (Bookings count, revenue, stats, reports, graphs, tables)
+        if re.search(r"\b(koyta\s*booking|koyti\s*booking|how\s*many\s*bookings|total\s*booking|booking\s*count|number\s*of\s*bookings|booking\s*hoice|booking\s*hoyse|booking\s*shongkha)\b", q) or \
+           re.search(r"\b(revenue|income|earning|taka|mot\s*taka|total\s*revenue|sales|mot\s*ay|ay\s*koto|koto\s*taka\s*income|day\s*wise|daily\s*report|chart|graph|table|report\s*generate)\b", q) or \
+           re.search(r"\b(last\s*30\s*din|last\s*month|gawto\s*mash|30\s*dine|7\s*dine|last\s*week)\b", q) and "booking" in q:
+            return "admin_revenue"
+
+        if re.search(r"\b(most\s*rented|popular|bestselling|top\s*car|beshi\s*rent|shobcheye\s*beshi|car\s*basis|car\s*wise|gari\s*basis)\b", q):
+            return "admin_most_rented"
+
+        if re.search(r"\b(maintenance|servicing|reparation|repair|problem|gari\s*kharap)\b", q):
+            return "admin_maintenance"
 
         # 4. User Personal Data Lookups
         if re.search(r"\b(amar\s*booking|my\s*booking|my\s*rentals|booking\s*status|amar\s*reservation|upcoming\s*trip)\b", q):

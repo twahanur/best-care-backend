@@ -47,34 +47,34 @@ class BookingState(BaseModel):
         next_f = missing[0]
         if next_f == "car":
             if language == "bangla":
-                return "আপনি কোন গাড়িটি বুক করতে চান? (যেমন: SUV, Prado, Camry, Tucson, HiAce) অথবা আপনি কি আমাদের সেরা অপশন দেখতে চান?"
+                return "আপনি কোন গাড়িটি বুক করতে আগ্রহী? (যেমন: SUV, Toyota Prado, Hyundai Tucson, বা Camry)"
             elif language == "banglish":
-                return "Apni kon car book korte chan? (Jemon: SUV, Prado, Camry, Tucson, HiAce) nicher theke bolte paren."
+                return "Apni kon gari book korte chan? (Jemon: SUV, Toyota Prado, Hyundai Tucson, ba Camry)"
             else:
-                return "Which vehicle would you like to book? (e.g., SUV, Prado, Camry, Tucson, HiAce)"
+                return "Which vehicle would you prefer to reserve? (e.g., SUV, Toyota Prado, Hyundai Tucson, or Camry)"
 
         elif next_f == "pickup_date":
             if language == "bangla":
-                return f"{self.car_name or 'গাড়িটি'} কোন তারিখে বুক করতে চান? (যেমন: আগামীকাল বা ৪ তারিখ)"
+                return f"{self.car_name or 'গাড়িটি'} কোন তারিখে আপনার প্রয়োজন হবে? (যেমন: আগামীকাল বা ৪ সেপ্টেম্বর)"
             elif language == "banglish":
-                return f"{self.car_name or 'Car ti'} kon date e book korte chan? (Jemon: agamikal ba 4 tarik)"
+                return f"{self.car_name or 'Car-ti'} kon date e lagbe? (Jemon: agamikal ba 4 tarik)"
             else:
-                return f"For which date would you like to book {self.car_name or 'the car'}?"
+                return f"On which date would you like to schedule pickup for {self.car_name or 'the vehicle'}?"
 
         elif next_f == "pickup_location":
             if language == "bangla":
-                return "পিকআপ লোকেশন কোথায় হবে? (যেমন: সোনাডাঙ্গা, গুলশান, বা এয়ারপোর্ট)"
+                return "আপনার সুবিধাজনক পিকআপ লোকেশন কোথায় হবে? (যেমন: সোনাডাঙ্গা, গুলশান, বা এয়ারপোর্ট)"
             elif language == "banglish":
-                return "Pickup location kothay hobe? (Jemon: Sonadanga, Gulshan, ba Airport)"
+                return "Apnar pickup location kothay hobe? (Jemon: Sonadanga, Gulshan, ba Dhaka Airport)"
             else:
-                return "Where would you like the vehicle to be picked up from?"
+                return "Where would you like our chauffeur to meet you for vehicle pickup?"
 
         elif next_f == "pickup_time":
             if language == "bangla":
-                return "কয়টার সময় পিকআপ করতে হবে? (যেমন: সকাল ১১টায় বা ৮টায়)"
+                return "সকাল বা বিকালের কোন সময়ে গাড়িটি ডেলিভারি চান? (যেমন: সকাল ১১:০০ টায় বা ৮:০০ টায়)"
             elif language == "banglish":
-                return "Sokal ba dupur kottay pick korbo? (Jemon: sokal 11 tay ba 8 tay)"
+                return "Gari ti kokhon deliver korbo? (Jemon: sokal 11:00 AM ba 8:00 AM)"
             else:
-                return "What time should the pickup be scheduled? (e.g., 11:00 AM or 8:00 AM)"
+                return "What time would you prefer for vehicle pickup? (e.g., 11:00 AM or 8:00 AM)"
 
         return ""

@@ -24,11 +24,11 @@ class BookingHandler:
         if entities.get("is_cancellation"):
             state.status = "cancelled"
             if language == "bangla":
-                msg = "আপনার বুকিং প্রসেস বাতিল করা হয়েছে। আর কোনো প্রশ্ন বা সাহায্য লাগলে জানাবেন।"
+                msg = "আপনার বুকিং প্রসেসটি বাতিল করা হয়েছে। অন্য কোনো গাড়ি বা সহায়তার প্রয়োজন হলে সানন্দে জানাবেন।"
             elif language == "banglish":
-                msg = "Apnar booking process cancel kora hoyeche. Aro kono proshno thakle bolte paren."
+                msg = "Apnar booking request cancel kora hoyeche. Aro kono car ba proshno thakle janate paren."
             else:
-                msg = "Your booking process has been cancelled. Let me know if you need anything else."
+                msg = "Your reservation request has been cancelled. Please let me know if you would like to explore other vehicles."
             return {
                 "message": msg,
                 "booking_state": state.model_dump(),
@@ -43,36 +43,36 @@ class BookingHandler:
 
             if language == "bangla":
                 msg = (
-                    f"✅ **বুকিং নিশ্চিত হয়েছে!**\n\n"
-                    f"📋 **বুকিং কোড:** `{state.booking_code}`\n"
-                    f"🚗 **গাড়ি:** {state.car_name}\n"
-                    f"📅 **তারিখ ও সময়:** {state.pickup_date}, {state.pickup_time}\n"
-                    f"📍 **পিকআপ:** {state.pickup_location}\n"
-                    f"📍 **ড্রপঅফ:** {state.dropoff_location or state.pickup_location}\n"
+                    f"🎉 **বুকিং সফলভাবে নিশ্চিত করা হয়েছে!**\n\n"
+                    f"📋 **বুকিং রেফারেন্স কোড:** `{state.booking_code}`\n"
+                    f"🚗 **নির্বাচিত গাড়ি:** {state.car_name}\n"
+                    f"📅 **তারিখ ও সময়:** {state.pickup_date}, সকাল/বিকাল {state.pickup_time}\n"
+                    f"📍 **পিকআপ পয়েন্ট:** {state.pickup_location}\n"
+                    f"📍 **ড্রপঅফ পয়েন্ট:** {state.dropoff_location or state.pickup_location}\n"
                     f"💰 **মোট ভাড়া:** ${state.total_amount}\n\n"
-                    f"আমাদের ড্রাইভার ও সাপোর্ট টিম সময়মতো আপনার সাথে যোগাযোগ করবে।"
+                    f"আমাদের ডেডিকেটেড ডিসপ্যাচ ও ড্রাইভ টিম নির্ধারিত সময়ে গাড়ি প্রস্তুত রাখবে। শুভ যাত্রা!"
                 )
             elif language == "banglish":
                 msg = (
-                    f"✅ **Booking Confirm Hoyeche!**\n\n"
+                    f"🎉 **Booking Confirmed Successfully!**\n\n"
                     f"📋 **Booking Code:** `{state.booking_code}`\n"
-                    f"🚗 **Car:** {state.car_name}\n"
-                    f"📅 **Date & Time:** {state.pickup_date}, {state.pickup_time}\n"
-                    f"📍 **Pickup:** {state.pickup_location}\n"
-                    f"📍 **Dropoff:** {state.dropoff_location or state.pickup_location}\n"
-                    f"💰 **Total:** ${state.total_amount}\n\n"
-                    f"Amader driver & support team timely apnar sathe jogajog korbe."
+                    f"🚗 **Vehicle:** {state.car_name}\n"
+                    f"📅 **Schedule:** {state.pickup_date} at {state.pickup_time}\n"
+                    f"📍 **Pickup Location:** {state.pickup_location}\n"
+                    f"📍 **Dropoff Location:** {state.dropoff_location or state.pickup_location}\n"
+                    f"💰 **Total Fare:** ${state.total_amount}\n\n"
+                    f"Amader dispatch team timely apnar sathe jogajog kore gari deliver korbe. Happy journey!"
                 )
             else:
                 msg = (
-                    f"✅ **Reservation Confirmed!**\n\n"
-                    f"📋 **Booking Code:** `{state.booking_code}`\n"
+                    f"🎉 **Reservation Confirmed!**\n\n"
+                    f"📋 **Booking Reference:** `{state.booking_code}`\n"
                     f"🚗 **Vehicle:** {state.car_name}\n"
-                    f"📅 **Pickup:** {state.pickup_date} at {state.pickup_time}\n"
-                    f"📍 **From:** {state.pickup_location}\n"
-                    f"📍 **To:** {state.dropoff_location or state.pickup_location}\n"
-                    f"💰 **Total:** ${state.total_amount}\n\n"
-                    f"Our chauffeur and dispatch team will arrive promptly at your scheduled time."
+                    f"📅 **Pickup Schedule:** {state.pickup_date} at {state.pickup_time}\n"
+                    f"📍 **Pickup Location:** {state.pickup_location}\n"
+                    f"📍 **Dropoff Location:** {state.dropoff_location or state.pickup_location}\n"
+                    f"💰 **Total Rate:** ${state.total_amount}\n\n"
+                    f"Our chauffeur and dispatch team will ensure your vehicle is sanitized and ready on time. Enjoy your journey!"
                 )
 
             return {
@@ -96,7 +96,6 @@ class BookingHandler:
             state.car_category = entities.get("category")
         elif entities.get("category") and not state.car_category:
             state.car_category = entities["category"]
-            # Auto-assign standard flagship for category if not specified
             if state.car_category == "SUV":
                 state.car_name = "Toyota Land Cruiser Prado TX"
                 state.car_id = "car_prado_suv"
@@ -133,7 +132,6 @@ class BookingHandler:
                 if state.car_name:
                     break
 
-        # Set default daily rate if car identified
         if state.car_name and not state.daily_rate:
             for v_info in VEHICLE_PATTERNS.values():
                 if v_info["name"].lower() in state.car_name.lower():
@@ -148,33 +146,33 @@ class BookingHandler:
 
             if language == "bangla":
                 preview = (
-                    f"📋 **বুকিং বিবরণী (Summary):**\n"
+                    f"📋 **বুকিং বিবরণী (Booking Summary):**\n\n"
                     f"🚗 **গাড়ি:** {state.car_name} (${state.daily_rate}/দিন)\n"
                     f"📅 **তারিখ ও সময়:** {state.pickup_date}, {state.pickup_time}\n"
                     f"📍 **পিকআপ:** {state.pickup_location}\n"
                     f"📍 **ড্রপঅফ:** {state.dropoff_location or state.pickup_location}\n"
-                    f"💰 **মোট ভাড়া:** ${state.total_amount} ({state.total_days} দিন)\n\n"
-                    f"**আপনি কি এটি নিশ্চিত (Confirm) করতে চান? (হ্যাঁ / না)**"
+                    f"💰 **আনুমানিক মোট ভাড়া:** ${state.total_amount} ({state.total_days} দিন)\n\n"
+                    f"**আপনি কি বুকিংটি নিশ্চিত (Confirm) করতে চান?**"
                 )
             elif language == "banglish":
                 preview = (
-                    f"📋 **Booking Summary:**\n"
+                    f"📋 **Booking Summary:**\n\n"
                     f"🚗 **Car:** {state.car_name} (${state.daily_rate}/day)\n"
-                    f"📅 **Date & Time:** {state.pickup_date}, {state.pickup_time}\n"
-                    f"📍 **Pickup:** {state.pickup_location}\n"
-                    f"📍 **Dropoff:** {state.dropoff_location or state.pickup_location}\n"
-                    f"💰 **Total:** ${state.total_amount} ({state.total_days} day)\n\n"
-                    f"**Apni ki confirm korte chan? (Haan / Na)**"
+                    f"📅 **Date & Time:** {state.pickup_date} at {state.pickup_time}\n"
+                    f"📍 **Pickup Location:** {state.pickup_location}\n"
+                    f"📍 **Dropoff Location:** {state.dropoff_location or state.pickup_location}\n"
+                    f"💰 **Total Fare:** ${state.total_amount} ({state.total_days} day)\n\n"
+                    f"**Apni ki booking ti confirm korte chan?**"
                 )
             else:
                 preview = (
-                    f"📋 **Reservation Summary:**\n"
+                    f"📋 **Reservation Summary:**\n\n"
                     f"🚗 **Vehicle:** {state.car_name} (${state.daily_rate}/day)\n"
                     f"📅 **Schedule:** {state.pickup_date} at {state.pickup_time}\n"
-                    f"📍 **Pickup:** {state.pickup_location}\n"
-                    f"📍 **Dropoff:** {state.dropoff_location or state.pickup_location}\n"
-                    f"💰 **Estimated Total:** ${state.total_amount} ({state.total_days} day)\n\n"
-                    f"**Would you like to confirm this reservation? (Yes / No)**"
+                    f"📍 **Pickup Location:** {state.pickup_location}\n"
+                    f"📍 **Dropoff Location:** {state.dropoff_location or state.pickup_location}\n"
+                    f"💰 **Total Rate:** ${state.total_amount} ({state.total_days} day)\n\n"
+                    f"**Would you like to confirm this reservation?**"
                 )
 
             return {
@@ -187,14 +185,13 @@ class BookingHandler:
                 }
             }
 
-        # 7. Still Missing Slots -> Ask Next Question
+        # 7. Still Missing Slots -> Ask Next Question with elegance
         next_q = state.next_question_prompt(language=language)
         state.last_question = next_q
 
-        # Add brief positive feedback about what was just captured
         prefix = ""
         if state.car_name and not current_state_dict.get("car_name"):
-            prefix = f"{state.car_name} select korechi ✓\n" if language == "banglish" else f"{state.car_name} নির্বাচন করা হয়েছে।\n"
+            prefix = f"✨ **{state.car_name}** নির্বাচন করা হয়েছে।\n\n" if language == "bangla" else f"✨ **{state.car_name}** selected.\n\n"
 
         return {
             "message": f"{prefix}{next_q}".strip(),

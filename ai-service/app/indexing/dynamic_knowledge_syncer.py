@@ -90,13 +90,14 @@ class DynamicKnowledgeSyncer:
         try:
             async with get_db_session() as session:
                 sql_cars = """
-                    SELECT c.id, c.name, c.brand, c.model, c.year, c.category,
-                           c.transmission, c."fuelType", c.seats, c.doors, c."luggageCapacity",
-                           c."dailyRate", c."securityDeposit", c.status, c."ratingAverage",
-                           c."isFeatured", lh.name as hub_name, lh.city as hub_city
+                    SELECT c.id, c.name, c.brand, c.model, c.year, CAST(c.category AS text) as category,
+                           CAST(c.transmission AS text) as transmission, CAST(c."fuelType" AS text) as "fuelType",
+                           c.seats, c.doors, c."luggageCapacity", c."dailyRate", c."securityDeposit",
+                           CAST(c.status AS text) as status, c."ratingAverage", c."isFeatured",
+                           lh.name as hub_name, lh.city as hub_city
                     FROM cars c
                     LEFT JOIN location_hubs lh ON c."currentHubId" = lh.id
-                    WHERE c.status != 'RETIRED';
+                    WHERE CAST(c.status AS text) != 'DECOMMISSIONED';
                 """
                 res = await session.execute(text(sql_cars))
                 cars_rows = res.mappings().all()
