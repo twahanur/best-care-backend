@@ -1,0 +1,57 @@
+// Payment & Financial Transaction Domain Models
+
+model Payment {
+  id                  String         @id @default(uuid())
+  transactionId       String         @unique
+  bookingId           String
+  userId              String
+  amount              Float
+  currency            String         @default("USD")
+  paymentMethod       PaymentMethod  @default(CREDIT_CARD)
+  paymentStatus       PaymentStatus  @default(PENDING)
+  gatewayName         String?        @default("MOCK_GATEWAY")
+  gatewayResponseJson Json?
+  invoiceNumber       String?
+  paidAt              DateTime?
+  refundedAt          DateTime?
+  refundReason        String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  // Relationships
+  booking             Booking        @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  user                User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  invoice             Invoice?
+
+  @@index([transactionId])
+  @@index([bookingId])
+  @@index([userId])
+  @@index([paymentStatus])
+  @@map("payments")
+}
+
+model Invoice {
+  id                  String       @id @default(uuid())
+  invoiceNumber       String       @unique
+  bookingId           String
+  userId              String
+  paymentId           String?      @unique
+  subtotal            Float
+  tax                 Float        @default(0)
+  discount            Float        @default(0)
+  total               Float
+  pdfUrl              String?
+  issuedAt            DateTime     @default(now())
+  paidAt              DateTime?
+  createdAt           DateTime     @default(now())
+
+  // Relationships
+  booking             Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment             Payment?     @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([invoiceNumber])
+  @@index([bookingId])
+  @@index([userId])
+  @@map("invoices")
+}

@@ -1,0 +1,37 @@
+// Pricing Rules & Discount Promo Coupons Domain Models
+
+model PricingRule {
+  id                  String       @id @default(uuid())
+  name                String
+  code                String       @unique
+  category            CarCategory?
+  startDate           DateTime?
+  endDate             DateTime?
+  multiplier          Float        @default(1.0)
+  fixedAdjustment     Float        @default(0)
+  driverDailyRate     Float        @default(30) // Base driver fee rate
+  isActive            Boolean      @default(true)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  @@map("pricing_rules")
+}
+
+model DiscountCoupon {
+  id                  String        @id @default(uuid())
+  code                String        @unique
+  discountType        DiscountType  @default(PERCENTAGE)
+  discountValue       Float
+  minBookingAmount    Float         @default(0)
+  maxDiscountAmount   Float?
+  startDate           DateTime      @default(now())
+  endDate             DateTime
+  usageLimit          Int           @default(100)
+  usedCount           Int           @default(0)
+  isActive            Boolean       @default(true)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@index([code])
+  @@map("discount_coupons")
+}

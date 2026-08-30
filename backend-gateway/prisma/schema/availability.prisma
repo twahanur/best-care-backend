@@ -1,0 +1,40 @@
+// Availability & Fleet Scheduling Domain Models
+
+model CarAvailability {
+  id                  String       @id @default(uuid())
+  carId               String
+  startDate           DateTime
+  endDate             DateTime
+  status              CarStatus    @default(AVAILABLE)
+  note                String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  // Relationships
+  car                 Car          @relation(fields: [carId], references: [id], onDelete: Cascade)
+
+  @@index([carId, startDate, endDate])
+  @@map("car_availabilities")
+}
+
+model MaintenanceSchedule {
+  id                  String           @id @default(uuid())
+  carId               String
+  maintenanceType     MaintenanceType  @default(ROUTINE_OIL_FILTER_SERVICE)
+  title               String
+  description         String?
+  cost                Float?
+  startDate           DateTime
+  endDate             DateTime
+  isCompleted         Boolean          @default(false)
+  servicedBy          String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  // Relationships
+  car                 Car              @relation(fields: [carId], references: [id], onDelete: Cascade)
+
+  @@index([carId])
+  @@index([maintenanceType])
+  @@map("maintenance_schedules")
+}

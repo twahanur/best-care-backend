@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { Booking, BookingStatus, ProtectionPlan } from '../../common/types/schema.types';
 import { CarsService } from '../cars/cars.service';
 import { PaymentsService } from '../payments/payments.service';
+import { sanitizeText } from '../../common/security/sanitize.util';
 
 @Injectable()
 export class BookingsService {
@@ -158,24 +159,37 @@ export class BookingsService {
   }
 
   create(dto: any, aiLeadScore?: any): Booking {
-    const id = `bkg_${Date.now()}`;
-    const randomCode = `RC-BK-${Math.floor(10000 + Math.random() * 90000)}`;
-
-    const carId = dto.carId || dto.vehicleId || 'car_jaguar_xe';
-    let carImage = dto.vehicleImage;
-    let carName = dto.vehicleName;
-    let dailyRate = Number(dto.dailyRate) || 85;
-
-    try {
-      const car = this.carsService.findOne(carId);
-      carName = car.name;
-      carImage = car.images[0];
-      dailyRate = car.dailyRate;
-    } catch {
-      // fallback
+    const carId = dto.carId || dto.vehicleId;
+    if (!carId) {
+      throw new BadRequestException('Car ID is required to create a booking.');
     }
 
-    const totalDays = Math.max(1, Number(dto.totalDays) || 1);
+    const car = this.carsService.findOne(carId);
+    if (!car) {
+      throw new NotFoundException('Selected vehicle was not found.');
+    }
+
+    // BUSINESS LOGIC VALIDATION: Validate Dates
+    let pickupDate = dto.pickupDate;
+    let dropoffDate = dto.dropoffDate;
+    let totalDays = Number(dto.totalDays) || 1;
+
+    if (pickupDate && dropoffDate) {
+      const pTime = new Date(pickupDate).getTime();
+      const dTime = new Date(dropoffDate).getTime();
+      if (isNaN(pTime) || isNaN(dTime) || dTime <= pTime) {
+        throw new BadRequestException('Invalid booking date range: dropoff date must be after pickup date.');
+      }
+      totalDays = Math.max(1, Math.ceil((dTime - pTime) / (1000 * 60 * 60 * 24)));
+    } else {
+      pickupDate = new Date().toISOString();
+      const nextDate = new Date();
+      nextDate.setDate(nextDate.getDate() + totalDays);
+      dropoffDate = nextDate.toISOString();
+    }
+
+    // Server-side calculated rates
+    const dailyRate = car.dailyRate;
     const plan: ProtectionPlan = dto.protectionPlan || 'Comprehensive Plus';
     let dailyProtectionFee = 0;
     if (plan === 'Comprehensive Plus') dailyProtectionFee = 18;
@@ -183,33 +197,37 @@ export class BookingsService {
 
     const protectionFee = dailyProtectionFee * totalDays;
     const baseAmount = dailyRate * totalDays;
-    const totalAmount = baseAmount + protectionFee;
+    const discountAmount = Math.max(0, Number(dto.discountAmount) || 0);
+    const totalAmount = Math.max(0, baseAmount + protectionFee - discountAmount);
+
+    const id = `bkg_${Date.now()}`;
+    const randomCode = `RC-BK-${Math.floor(10000 + Math.random() * 90000)}`;
 
     const newBooking: Booking = {
       id,
       bookingCode: randomCode,
       userId: dto.userId || 'usr_cust_1',
-      customerName: dto.customerName || 'Customer',
-      customerEmail: dto.customerEmail || 'customer@example.com',
-      customerPhone: dto.customerPhone || '+8801700000000',
-      carId,
-      vehicleName: carName,
-      vehicleImage: carImage,
-      pickupDate: dto.pickupDate,
-      dropoffDate: dto.dropoffDate,
-      pickupLocation: dto.pickupLocation || 'Hazrat Shahjalal Intl Airport (DAC)',
-      dropoffLocation: dto.dropoffLocation || 'Hazrat Shahjalal Intl Airport (DAC)',
+      customerName: sanitizeText(dto.customerName) || 'Customer',
+      customerEmail: (dto.customerEmail || 'customer@example.com').toLowerCase().trim(),
+      customerPhone: sanitizeText(dto.customerPhone) || '+8801700000000',
+      carId: car.id,
+      vehicleName: car.name,
+      vehicleImage: car.images && car.images[0] ? car.images[0] : 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=800&q=80',
+      pickupDate,
+      dropoffDate,
+      pickupLocation: sanitizeText(dto.pickupLocation) || 'Hazrat Shahjalal Intl Airport (DAC)',
+      dropoffLocation: sanitizeText(dto.dropoffLocation) || 'Hazrat Shahjalal Intl Airport (DAC)',
       totalDays,
       dailyRate,
       baseAmount,
       protectionPlan: plan,
       protectionFee,
-      securityDeposit: dto.securityDeposit || 200,
-      discountAmount: 0,
+      securityDeposit: car.securityDeposit || 200,
+      discountAmount,
       totalAmount,
       status: 'Confirmed',
       paymentStatus: 'Paid',
-      notes: dto.notes || '',
+      notes: sanitizeText(dto.notes) || '',
       aiLeadScore: aiLeadScore || {
         score: 82,
         classification: 'Hot',
@@ -222,7 +240,7 @@ export class BookingsService {
 
     this.bookings.unshift(newBooking);
 
-    // Auto-record completed payment
+    // Auto-record completed payment using verified server totalAmount
     this.paymentsService.create({
       bookingId: newBooking.id,
       bookingCode: newBooking.bookingCode,
@@ -256,7 +274,7 @@ export class BookingsService {
     }
 
     booking.status = 'Cancelled';
-    booking.cancellationReason = reason || 'Customer requested free cancellation.';
+    booking.cancellationReason = sanitizeText(reason) || 'Customer requested free cancellation.';
     booking.cancelledAt = new Date().toISOString();
     booking.refundAmount = booking.totalAmount;
     booking.paymentStatus = 'Refunded';
@@ -269,12 +287,67 @@ export class BookingsService {
     return booking;
   }
 
+  processRentalReturn(id: string, inspection: { returnOdometer: number; returnFuelLevel: number; returnDamageNotes?: string; extraCharges?: number }): Booking {
+    const booking = this.findOne(id);
+    booking.status = 'Completed';
+    booking.updatedAt = new Date().toISOString();
+    
+    // Release vehicle
+    this.carsService.updateCarStatus(booking.carId, 'AVAILABLE');
+
+    return booking;
+  }
+
+  createPosBooking(dto: any): Booking {
+    return this.create({
+      ...dto,
+      notes: `POS Walk-in Counter Order: ${dto.notes || 'Instant Desk Checkout'}`
+    });
+  }
+
+  getDriverBookings(driverId: string): Booking[] {
+    return this.bookings.filter(b => b.driverId === driverId || (!b.driverId && b.withDriver));
+  }
+
+  driverRespondToTrip(id: string, driverId: string, action: 'ACCEPT' | 'REJECT'): Booking {
+    const booking = this.findOne(id);
+    if (action === 'ACCEPT') {
+      booking.driverId = driverId;
+      booking.driverTripStatus = 'ACCEPTED';
+      booking.status = 'Confirmed';
+    } else {
+      booking.driverTripStatus = 'REJECTED';
+      booking.driverId = undefined;
+    }
+    booking.updatedAt = new Date().toISOString();
+    return booking;
+  }
+
+  updateDriverTripStatus(id: string, tripStatus: any): Booking {
+    const booking = this.findOne(id);
+    booking.driverTripStatus = tripStatus;
+    booking.updatedAt = new Date().toISOString();
+
+    if (tripStatus === 'TRIP_IN_PROGRESS') {
+      booking.status = 'Active';
+      this.carsService.updateCarStatus(booking.carId, 'RENTED');
+    } else if (tripStatus === 'DROPOFF_COMPLETED') {
+      booking.status = 'Completed';
+      this.carsService.updateCarStatus(booking.carId, 'AVAILABLE');
+    }
+
+    return booking;
+  }
+
+  getCustomerBookings(userId: string): Booking[] {
+    return this.bookings.filter(b => b.userId === userId);
+  }
+
   getRecentBookings(limit: number = 5): Booking[] {
     return this.bookings.slice(0, limit);
   }
 
   getMetrics() {
-
     const totalBookings = this.bookings.length;
     const activeRentals = this.bookings.filter(b => b.status === 'Active').length;
     const totalRevenue = this.bookings

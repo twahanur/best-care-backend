@@ -1,0 +1,150 @@
+// Global Enums for Enterprise Car Rental Platform
+
+enum UserRole {
+  ADMIN
+  CUSTOMER
+  CAR_DRIVER
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+enum KycStatus {
+  NOT_SUBMITTED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum CarCategory {
+  SEDAN
+  SUV
+  ELECTRIC
+  LUXURY
+  PASSENGER_VAN
+  SPORTS
+  HATCHBACK
+}
+
+enum Transmission {
+  AUTOMATIC
+  MANUAL
+}
+
+enum FuelType {
+  PETROL
+  DIESEL
+  ELECTRIC
+  HYBRID
+  OCTANE
+  CNG
+}
+
+enum CarStatus {
+  AVAILABLE
+  RENTED
+  MAINTENANCE
+  DECOMMISSIONED
+}
+
+enum ProtectionPlan {
+  BASIC_CDW
+  COMPREHENSIVE_PLUS
+  VIP_FULL_SHIELD
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  ACTIVE_RENTAL
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+  BKASH
+  NAGAD
+  CASH
+  BANK_TRANSFER
+}
+
+enum ReviewStatus {
+  PENDING_MODERATION
+  APPROVED
+  REJECTED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+enum ReportType {
+  REVENUE
+  FLEET_UTILIZATION
+  BOOKING_SUMMARY
+  USER_ANALYTICS
+}
+
+// -------------------------------------------------------------
+// 1. রেন্টাল সার্ভিস মোড
+// -------------------------------------------------------------
+enum RentalServiceType {
+  SELF_DRIVE
+  CHAUFFEUR_DRIVEN
+  AIRPORT_TRANSFER
+  INTERCITY_TOUR
+  HOURLY_CHARTER
+  WEDDING_VIP_EVENT
+}
+
+// -------------------------------------------------------------
+// 2. রেন্টাল অ্যাড-অনস ও অ্যাক্সেসরিজ
+// -------------------------------------------------------------
+enum RentalAddon {
+  CHILD_BABY_SEAT
+  PORTABLE_WIFI_HOTSPOT
+  DASHCAM_RECORDER
+  ROOF_LUGGAGE_BOX
+  ADDITIONAL_DRIVER_PERMIT
+  PET_PROTECTION_COVER
+}
+
+// -------------------------------------------------------------
+// 3. মেনটেইন্যান্স ক্যাটাগরি
+// -------------------------------------------------------------
+enum MaintenanceType {
+  ROUTINE_OIL_FILTER_SERVICE
+  BRAKE_PAD_REPLACEMENT
+  TIRE_ALIGNMENT_ROTATION
+  BATTERY_HEALTH_CHECK
+  CERAMIC_DETAILING
+  BODY_PAINT_REPAIR
+  AC_DEEP_CLEAN
+}
+
+// -------------------------------------------------------------
+// 4. ড্রাইভার ট্রিপ লাইফসাইকেল
+// -------------------------------------------------------------
+enum DriverTripStatus {
+  NOT_ASSIGNED
+  ASSIGNED_PENDING
+  ACCEPTED
+  REJECTED
+  EN_ROUTE_TO_PICKUP
+  ARRIVED_AT_HUB
+  TRIP_IN_PROGRESS
+  DROPOFF_COMPLETED
+}

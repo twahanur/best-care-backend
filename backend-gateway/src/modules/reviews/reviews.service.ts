@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Review } from '../../common/types/schema.types';
 import { CarsService } from '../cars/cars.service';
+import { sanitizeText } from '../../common/security/sanitize.util';
 
 @Injectable()
 export class ReviewsService {
@@ -69,16 +70,20 @@ export class ReviewsService {
   }
 
   create(dto: { bookingId: string; userId: string; userName: string; userAvatar?: string; carId: string; carName: string; rating: number; comment: string }): Review {
+    const cleanUserName = sanitizeText(dto.userName) || 'Verified Renter';
+    const cleanComment = sanitizeText(dto.comment);
+    const cleanCarName = sanitizeText(dto.carName) || 'Fleet Vehicle';
+
     const newReview: Review = {
       id: `rev_${Date.now()}`,
       bookingId: dto.bookingId,
       userId: dto.userId,
-      userName: dto.userName,
-      userAvatar: dto.userAvatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(dto.userName)}`,
+      userName: cleanUserName,
+      userAvatar: dto.userAvatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanUserName)}`,
       carId: dto.carId,
-      carName: dto.carName,
-      rating: Math.min(5, Math.max(1, dto.rating)),
-      comment: dto.comment,
+      carName: cleanCarName,
+      rating: Math.min(5, Math.max(1, Number(dto.rating) || 5)),
+      comment: cleanComment,
       isApproved: true,
       createdAt: new Date().toISOString()
     };
@@ -98,7 +103,7 @@ export class ReviewsService {
 
     review.isApproved = isApproved;
     if (adminReply !== undefined) {
-      review.adminReply = adminReply;
+      review.adminReply = sanitizeText(adminReply);
     }
     return review;
   }

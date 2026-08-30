@@ -1,0 +1,95 @@
+// Booking, Reservation & Rental Inspection Domain Models
+
+model Booking {
+  id                  String             @id @default(uuid())
+  bookingCode         String             @unique
+  userId              String             // Customer
+  driverId            String?            // Optional Assigned Car Driver
+  carId               String
+  pickupHubId         String?
+  dropoffHubId        String?
+  serviceType         RentalServiceType  @default(SELF_DRIVE)
+  driverTripStatus    DriverTripStatus   @default(NOT_ASSIGNED)
+  pickupDateTime      DateTime
+  dropoffDateTime     DateTime
+  totalDays           Int
+  dailyRate           Float
+  driverFee           Float              @default(0)
+  baseAmount          Float
+  protectionPlan      ProtectionPlan     @default(BASIC_CDW)
+  protectionFee       Float              @default(0)
+  securityDeposit     Float              @default(0)
+  discountAmount      Float              @default(0)
+  taxAmount           Float              @default(0)
+  totalAmount         Float
+  withDriver          Boolean            @default(false)
+  status              BookingStatus      @default(PENDING)
+  paymentStatus       PaymentStatus      @default(PENDING)
+  cancellationReason  String?
+  cancelledAt         DateTime?
+  refundAmount        Float?
+  customerNotes       String?
+  adminNotes          String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  // Relationships
+  user                User               @relation("CustomerBookingRelation", fields: [userId], references: [id], onDelete: Restrict)
+  assignedDriver      User?              @relation("DriverBookingRelation", fields: [driverId], references: [id], onDelete: SetNull)
+  car                 Car                @relation(fields: [carId], references: [id], onDelete: Restrict)
+  pickupHub           LocationHub?       @relation("PickupHubRelation", fields: [pickupHubId], references: [id], onDelete: SetNull)
+  dropoffHub          LocationHub?       @relation("DropoffHubRelation", fields: [dropoffHubId], references: [id], onDelete: SetNull)
+  addons              BookingAddon[]
+  payments            Payment[]
+  inspection          RentalInspection?
+  review              Review?
+  invoices            Invoice[]
+
+  @@index([bookingCode])
+  @@index([userId])
+  @@index([driverId])
+  @@index([carId])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([pickupDateTime, dropoffDateTime])
+  @@map("bookings")
+}
+
+model BookingAddon {
+  id                  String       @id @default(uuid())
+  bookingId           String
+  addon               RentalAddon
+  dailyPrice          Float        @default(0)
+  totalPrice          Float        @default(0)
+  createdAt           DateTime     @default(now())
+
+  // Relationships
+  booking             Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@map("booking_addons")
+}
+
+model RentalInspection {
+  id                  String       @id @default(uuid())
+  bookingId           String       @unique
+  pickupOdometer      Float
+  returnOdometer      Float?
+  pickupFuelLevel     Float        @default(100) // Percentage (0-100)
+  returnFuelLevel     Float?
+  pickupDamageNotes   String?
+  returnDamageNotes   String?
+  extraMileageFee     Float        @default(0)
+  extraFuelFee        Float        @default(0)
+  damageFee           Float        @default(0)
+  totalExtraFee       Float        @default(0)
+  inspectedByPickup   String?
+  inspectedByReturn   String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  // Relationships
+  booking             Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("rental_inspections")
+}

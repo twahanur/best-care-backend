@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Payment, PaymentMethod, PaymentStatus } from '../../common/types/schema.types';
+import { sanitizeText } from '../../common/security/sanitize.util';
 
 @Injectable()
 export class PaymentsService {
@@ -75,16 +76,22 @@ export class PaymentsService {
     return result;
   }
 
-  create(dto: { bookingId: string; bookingCode: string; userId: string; customerName: string; amount: number; paymentMethod: PaymentMethod }): Payment {
+  create(dto: { bookingId: string; bookingCode?: string; userId: string; customerName: string; amount: number; paymentMethod?: PaymentMethod }): Payment {
+    const rawAmount = Number(dto.amount);
+    // BUSINESS LOGIC & SECURITY FIX: Reject negative or non-positive payment amounts
+    if (isNaN(rawAmount) || rawAmount <= 0) {
+      throw new BadRequestException('Payment amount must be a positive number.');
+    }
+
     const randomCode = `TXN-${Math.floor(100000 + Math.random() * 900000)}`;
     const newPayment: Payment = {
       id: `txn_${Date.now()}`,
       transactionCode: randomCode,
       bookingId: dto.bookingId,
-      bookingCode: dto.bookingCode,
+      bookingCode: dto.bookingCode || `RC-BK-${Math.floor(10000 + Math.random() * 90000)}`,
       userId: dto.userId,
-      customerName: dto.customerName,
-      amount: dto.amount,
+      customerName: sanitizeText(dto.customerName) || 'Customer',
+      amount: rawAmount,
       currency: 'USD',
       paymentMethod: dto.paymentMethod || 'Credit Card',
       status: 'COMPLETED',

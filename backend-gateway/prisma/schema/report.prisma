@@ -1,0 +1,17 @@
+// Backend Operational Reports & Analytics Domain Models
+
+model ReportRecord {
+  id                  String       @id @default(uuid())
+  reportType          ReportType
+  title               String
+  parametersJson      Json?
+  summaryJson         Json
+  generatedById       String?
+  createdAt           DateTime     @default(now())
+
+  // Relationships
+  generatedBy         User?        @relation(fields: [generatedById], references: [id], onDelete: SetNull)
+
+  @@index([reportType])
+  @@map("report_records")
+}

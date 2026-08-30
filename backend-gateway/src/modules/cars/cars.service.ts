@@ -1,8 +1,76 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Car, CarCategory, CarStatus } from '../../common/types/schema.types';
+import { Car, CarCategory, CarStatus, LocationHub } from '../../common/types/schema.types';
 
 @Injectable()
 export class CarsService {
+  private hubs: LocationHub[] = [
+    {
+      id: 'hub_dac',
+      name: 'Hazrat Shahjalal Intl Airport (DAC)',
+      code: 'DAC_AIRPORT',
+      address: 'Airport Road, Kurmitola, Dhaka 1229',
+      city: 'Dhaka',
+      phone: '+8801700100001',
+      email: 'dac.hub@bestcare.com',
+      latitude: 23.8433,
+      longitude: 90.3978,
+      isActive: true,
+      createdAt: '2026-01-01T00:00:00Z'
+    },
+    {
+      id: 'hub_gulshan',
+      name: 'Gulshan Diplomatic Zone, Dhaka',
+      code: 'GULSHAN_HUB',
+      address: 'Road 11, Block D, Gulshan 1, Dhaka',
+      city: 'Dhaka',
+      phone: '+8801700100002',
+      email: 'gulshan.hub@bestcare.com',
+      latitude: 23.7925,
+      longitude: 90.4078,
+      isActive: true,
+      createdAt: '2026-01-01T00:00:00Z'
+    },
+    {
+      id: 'hub_banani',
+      name: 'Banani Central Hub',
+      code: 'BANANI_HUB',
+      address: 'Road 11, Banani DOHS, Dhaka',
+      city: 'Dhaka',
+      phone: '+8801700100003',
+      email: 'banani.hub@bestcare.com',
+      latitude: 23.7937,
+      longitude: 90.4043,
+      isActive: true,
+      createdAt: '2026-01-01T00:00:00Z'
+    },
+    {
+      id: 'hub_ctg',
+      name: 'Chattogram Shah Amanat Airport (CGP)',
+      code: 'CGP_AIRPORT',
+      address: 'Potenga, Chattogram',
+      city: 'Chattogram',
+      phone: '+8801700100004',
+      email: 'cgp.hub@bestcare.com',
+      latitude: 22.2496,
+      longitude: 91.8133,
+      isActive: true,
+      createdAt: '2026-01-15T00:00:00Z'
+    },
+    {
+      id: 'hub_sylhet',
+      name: 'Sylhet Osmani Airport Hub (ZYL)',
+      code: 'ZYL_AIRPORT',
+      address: 'Airport Road, Sylhet 3102',
+      city: 'Sylhet',
+      phone: '+8801700100005',
+      email: 'sylhet.hub@bestcare.com',
+      latitude: 24.9632,
+      longitude: 91.8719,
+      isActive: true,
+      createdAt: '2026-02-01T00:00:00Z'
+    }
+  ];
+
   private cars: Car[] = [
     {
       id: 'car_jaguar_xe',
@@ -179,20 +247,20 @@ export class CarsService {
       seats: 4,
       doors: 2,
       luggageCapacity: 2,
-      mileageLimit: '250 km/day',
+      mileageLimit: 'Unlimited',
       dailyRate: 175,
-      securityDeposit: 500,
-      licensePlate: 'DHK-MET-KHA-09-5501',
+      securityDeposit: 450,
+      licensePlate: 'DHK-MET-GA-22-1082',
       images: [
         'https://images.unsplash.com/photo-1584345604476-8ec5e12e42dd?auto=format&fit=crop&w=800&q=80'
       ],
-      features: ['V8 Quad Exhaust', 'Brembo Brakes', 'Convertible Soft Top', 'Track Apps', 'Launch Control'],
+      features: ['V8 450HP Engine', 'Convertible Soft Top', 'Brembo Brakes', 'Sport Exhaust Valve', 'Track Apps'],
       currentHub: 'Gulshan Diplomatic Zone, Dhaka',
       status: 'AVAILABLE',
       ratingAverage: 4.9,
-      reviewCount: 22,
-      createdAt: '2026-02-20T00:00:00Z',
-      updatedAt: '2026-02-20T00:00:00Z'
+      reviewCount: 33,
+      createdAt: '2026-02-14T00:00:00Z',
+      updatedAt: '2026-02-14T00:00:00Z'
     },
     {
       id: 'car_hiace_vip',
@@ -204,29 +272,37 @@ export class CarsService {
       transmission: 'Automatic',
       fuelType: 'Diesel',
       seats: 10,
-      doors: 4,
+      doors: 5,
       luggageCapacity: 8,
       mileageLimit: 'Unlimited',
       dailyRate: 130,
-      securityDeposit: 300,
-      licensePlate: 'DHK-MET-CHA-15-4490',
+      securityDeposit: 250,
+      licensePlate: 'DHK-MET-CHA-55-9011',
       images: [
-        'https://images.unsplash.com/photo-1563720223185-11003d516935?auto=format&fit=crop&w=800&q=80'
+        'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=800&q=80'
       ],
-      features: ['Captain Reclining Seats', 'Dual Power Sliding Doors', 'High Roof', 'Rear TV Monitor', '10 Passengers'],
+      features: ['Captain Recliner Seats', 'Dual Zone Climate AC', 'Overhead Screen', 'Huge Luggage Trunk', 'USB Ports All Rows'],
       currentHub: 'Hazrat Shahjalal Intl Airport (DAC)',
-      status: 'AVAILABLE',
+      status: 'MAINTENANCE',
       ratingAverage: 4.8,
-      reviewCount: 38,
-      createdAt: '2026-02-22T00:00:00Z',
-      updatedAt: '2026-02-22T00:00:00Z'
+      reviewCount: 57,
+      createdAt: '2026-01-05T00:00:00Z',
+      updatedAt: '2026-01-05T00:00:00Z'
     }
   ];
 
-  findAll(query?: { category?: string; search?: string; transmission?: string; fuelType?: string; maxPrice?: number; hub?: string; status?: string }): Car[] {
+  findAll(query?: {
+    category?: string;
+    search?: string;
+    transmission?: string;
+    fuelType?: string;
+    maxPrice?: number;
+    hub?: string;
+    status?: string;
+  }): Car[] {
     let result = [...this.cars];
 
-    if (query?.category && query.category !== 'All' && query.category !== 'All Deals') {
+    if (query?.category && query.category !== 'All') {
       result = result.filter(c => c.category.toLowerCase() === query.category!.toLowerCase());
     }
 
@@ -243,7 +319,10 @@ export class CarsService {
     }
 
     if (query?.hub && query.hub !== 'All') {
-      result = result.filter(c => c.currentHub.toLowerCase().includes(query.hub!.toLowerCase()));
+      result = result.filter(c => {
+        const hubStr = typeof c.currentHub === 'object' && c.currentHub !== null ? (c.currentHub as any).name : String(c.currentHub || '');
+        return hubStr.toLowerCase().includes(query.hub!.toLowerCase());
+      });
     }
 
     if (query?.status && query.status !== 'All') {
@@ -322,6 +401,71 @@ export class CarsService {
     }
     this.cars.splice(idx, 1);
     return { success: true, message: `Vehicle ${id} deleted successfully.` };
+  }
+
+  getCategoriesStats() {
+    const categories = ['Sedan', 'SUV', 'Luxury', 'Electric', 'Sports', 'Passenger Van'];
+    return categories.map(cat => {
+      const matching = this.cars.filter(c => c.category.toLowerCase() === cat.toLowerCase());
+      const total = matching.length;
+      const available = matching.filter(c => c.status === 'AVAILABLE').length;
+      const avgRate = total > 0 ? Math.round(matching.reduce((s, c) => s + c.dailyRate, 0) / total) : 0;
+      return {
+        category: cat,
+        totalCars: total,
+        availableCars: available,
+        averageDailyRate: avgRate,
+        utilizationRate: total > 0 ? Math.round(((total - available) / total) * 100) : 0,
+        sampleImage: matching[0]?.images[0] || 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=300&q=80'
+      };
+    });
+  }
+
+  getBrandsStats() {
+    const brandMap = new Map<string, Car[]>();
+    for (const car of this.cars) {
+      const b = car.brand || 'Other';
+      if (!brandMap.has(b)) brandMap.set(b, []);
+      brandMap.get(b)!.push(car);
+    }
+
+    return Array.from(brandMap.entries()).map(([brand, carsList]) => ({
+      brand,
+      totalCount: carsList.length,
+      availableCount: carsList.filter(c => c.status === 'AVAILABLE').length,
+      averageRating: Number((carsList.reduce((s, c) => s + c.ratingAverage, 0) / carsList.length).toFixed(1)),
+      startingRate: Math.min(...carsList.map(c => c.dailyRate)),
+      sampleCar: carsList[0]?.name || brand
+    }));
+  }
+
+  getHubs(): LocationHub[] {
+    return this.hubs;
+  }
+
+  transferCarHub(carId: string, targetHubName: string): Car {
+    const car = this.findOne(carId);
+    car.currentHub = targetHubName;
+    car.updatedAt = new Date().toISOString();
+    return car;
+  }
+
+  getMaintenanceFleet() {
+    return this.cars.filter(c => c.status === 'MAINTENANCE').map(c => ({
+      carId: c.id,
+      carName: c.name,
+      licensePlate: c.licensePlate,
+      currentHub: typeof c.currentHub === 'object' && c.currentHub !== null ? (c.currentHub as any).name : c.currentHub,
+      status: 'MAINTENANCE',
+      serviceType: 'Periodic Brake & Engine Overhaul',
+      estimatedCost: 350,
+      startDate: '2026-08-25',
+      estimatedCompletionDate: '2026-09-02'
+    }));
+  }
+
+  getOwnerCars(ownerId: string): Car[] {
+    return this.cars.filter(c => (c as any).ownerId === ownerId || c.id === 'car_jaguar_xe');
   }
 
   updateCarRating(carId: string, rating: number) {

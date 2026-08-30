@@ -1,0 +1,39 @@
+// User & Identity Domain Models (Admin, Customer, Car Driver)
+
+model User {
+  id                  String       @id @default(uuid())
+  email               String       @unique
+  passwordHash        String
+  name                String
+  phone               String?
+  role                UserRole     @default(CUSTOMER)
+  status              UserStatus   @default(ACTIVE)
+  kycStatus           KycStatus    @default(NOT_SUBMITTED)
+  avatarUrl           String?
+  drivingLicenseNo    String?
+  licenseExpiryDate   DateTime?
+  licenseImageFront   String?
+  licenseImageBack    String?
+  experienceYears     Int?         @default(0) // Driver experience
+  isAvailableForTrip  Boolean      @default(true) // For Car Driver
+  driverRating        Float?       @default(5.0)
+  totalTripsCompleted Int          @default(0)
+  address             String?
+  city                String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  // Relationships
+  ownedCars           Car[]        @relation("CarOwnerRelation")
+  customerBookings    Booking[]    @relation("CustomerBookingRelation")
+  driverBookings      Booking[]    @relation("DriverBookingRelation")
+  payments            Payment[]
+  reviews             Review[]
+  invoices            Invoice[]
+  generatedReports    ReportRecord[]
+
+  @@index([email])
+  @@index([role])
+  @@index([status])
+  @@map("users")
+}

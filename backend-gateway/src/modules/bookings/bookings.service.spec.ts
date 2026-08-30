@@ -1,12 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BookingsService } from './bookings.service';
+import { CarsService } from '../cars/cars.service';
+import { PaymentsService } from '../payments/payments.service';
 
 describe('BookingsService', () => {
   let service: BookingsService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [BookingsService],
+      providers: [BookingsService, CarsService, PaymentsService],
     }).compile();
 
     service = module.get<BookingsService>(BookingsService);
@@ -39,7 +41,7 @@ describe('BookingsService', () => {
     });
 
     expect(newBooking).toBeDefined();
-    expect(newBooking.bookingCode).toContain('DP-BK-');
+    expect(newBooking.bookingCode).toContain('RC-BK-');
     expect(newBooking.protectionFee).toBe(18 * 3); // 54
     expect(newBooking.totalAmount).toBe(145 * 3 + 54); // 489
   });
@@ -49,4 +51,3 @@ describe('BookingsService', () => {
     expect(updated.status).toBe('Confirmed');
   });
 });
-

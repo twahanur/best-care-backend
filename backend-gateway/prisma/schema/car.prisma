@@ -1,0 +1,98 @@
+// Vehicle & Fleet Domain Models
+
+model LocationHub {
+  id                  String       @id @default(uuid())
+  name                String
+  code                String       @unique
+  address             String
+  city                String
+  phone               String?
+  email               String?
+  latitude            Float?
+  longitude           Float?
+  isActive            Boolean      @default(true)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  // Relationships
+  carsAtHub           Car[]        @relation("CarLocationHub")
+  pickupBookings      Booking[]    @relation("PickupHubRelation")
+  dropoffBookings     Booking[]    @relation("DropoffHubRelation")
+
+  @@index([code])
+  @@index([city])
+  @@map("location_hubs")
+}
+
+model Car {
+  id                  String         @id @default(uuid())
+  name                String
+  brand               String
+  model               String
+  year                Int
+  category            CarCategory    @default(SEDAN)
+  transmission        Transmission   @default(AUTOMATIC)
+  fuelType            FuelType       @default(PETROL)
+  seats               Int            @default(5)
+  doors               Int            @default(4)
+  luggageCapacity     Int            @default(3)
+  mileageLimit        String         @default("Unlimited")
+  dailyRate           Float
+  securityDeposit     Float          @default(200)
+  licensePlate        String         @unique
+  vin                 String?        @unique
+  currentHubId        String?
+  ownerId             String?        // Driver or Car Owner Account ID
+  status              CarStatus      @default(AVAILABLE)
+  ratingAverage       Float          @default(5.0)
+  reviewCount         Int            @default(0)
+  isFeatured          Boolean        @default(false)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  // Relationships
+  currentHub          LocationHub?   @relation("CarLocationHub", fields: [currentHubId], references: [id], onDelete: SetNull)
+  owner               User?          @relation("CarOwnerRelation", fields: [ownerId], references: [id], onDelete: SetNull)
+  images              CarImage[]
+  features            CarFeature[]
+  availabilities      CarAvailability[]
+  maintenanceRecords  MaintenanceSchedule[]
+  bookings            Booking[]
+  reviews             Review[]
+
+  @@index([category])
+  @@index([status])
+  @@index([brand])
+  @@index([ownerId])
+  @@index([dailyRate])
+  @@map("cars")
+}
+
+model CarImage {
+  id                  String       @id @default(uuid())
+  carId               String
+  url                 String
+  isPrimary           Boolean      @default(false)
+  caption             String?
+  displayOrder        Int          @default(0)
+  createdAt           DateTime     @default(now())
+
+  // Relationships
+  car                 Car          @relation(fields: [carId], references: [id], onDelete: Cascade)
+
+  @@index([carId])
+  @@map("car_images")
+}
+
+model CarFeature {
+  id                  String       @id @default(uuid())
+  carId               String
+  name                String
+  iconKey             String?
+
+  // Relationships
+  car                 Car          @relation(fields: [carId], references: [id], onDelete: Cascade)
+
+  @@index([carId])
+  @@map("car_features")
+}

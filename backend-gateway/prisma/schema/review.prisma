@@ -1,0 +1,27 @@
+// Review & Rating Domain Models
+
+model Review {
+  id                  String        @id @default(uuid())
+  carId               String
+  userId              String
+  bookingId           String        @unique
+  rating              Int           @default(5) // 1 to 5
+  driverRating        Int?          // 1 to 5 if booking had driver
+  title               String?
+  comment             String
+  status              ReviewStatus  @default(APPROVED)
+  adminModeratedBy    String?
+  moderatedAt         DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  // Relationships
+  car                 Car           @relation(fields: [carId], references: [id], onDelete: Cascade)
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking             Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([carId])
+  @@index([userId])
+  @@index([status])
+  @@map("reviews")
+}
