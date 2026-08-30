@@ -1,68 +1,61 @@
-"""
-Database Connection Manager and Async Session Factory.
-Supports PostgreSQL (with pgvector) and transparent SQLite fallback for offline/isolated unit testing.
-"""
 import asyncio
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.pool import NullPool
 from sqlalchemy import text
+from sqlalchemy.pool import NullPool
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from app.core.config import settings
 from app.core.models import Base
 
-engine = None
-AsyncSessionLocal = None
-_db_is_sqlite_fallback = False
+# Create Async Engine with NullPool for robust event loop compatibility with Neon PostgreSQL
+engine = create_async_engine(
+    settings.DATABASE_URL,
+    echo=False,
+    poolclass=NullPool
+)
 
-async def init_database_engine():
-    global engine, AsyncSessionLocal, _db_is_sqlite_fallback
-    
-    db_url = settings.DATABASE_URL
-    try:
-        # Attempt connecting to primary PostgreSQL engine with NullPool
-        test_engine = create_async_engine(
-            db_url,
-            echo=False,
-            poolclass=NullPool
-        )
-        async with test_engine.connect() as conn:
-            # Enable pgvector extension in Postgres if available
-            try:
-                await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
-                await conn.commit()
-            except Exception:
-                pass
-            await conn.execute(text("SELECT 1;"))
-        
-        engine = test_engine
-        AsyncSessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
-        _db_is_sqlite_fallback = False
-        print(f"[Database] Successfully connected to PostgreSQL: {db_url.split('@')[-1] if '@' in db_url else db_url}")
-    except Exception as e:
-        print(f"[Database] Notice: PostgreSQL not accessible ({e}). Initializing in-memory fallback engine for offline execution.")
-        fallback_url = "sqlite+aiosqlite:///:memory:"
-        engine = create_async_engine(fallback_url, echo=False)
-        AsyncSessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
-        _db_is_sqlite_fallback = True
-
-    # Create tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    
-    print("[Database] Schema tables initialized.")
+AsyncSessionLocal = async_sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False
+)
 
 @asynccontextmanager
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
-    global AsyncSessionLocal
-    if AsyncSessionLocal is None:
-        await init_database_engine()
-    
-    session = AsyncSessionLocal()
-    try:
-        yield session
-    except Exception:
-        await session.rollback()
-        raise
-    finally:
-        await session.close()
+    """Provide a transactional scope around a series of operations."""
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
+
+async def init_db():
+    """
+    Initialize PostgreSQL extensions, drop obsolete RAG tables, and create new tables.
+    """
+    async with engine.begin() as conn:
+        try:
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+        except Exception as e:
+            print(f"[DB] Vector extension notice: {e}")
+
+        legacy_tables = [
+            "user_memories",
+            "chat_messages",
+            "chat_conversations",
+            "embedding_jobs",
+            "rag_embeddings",
+            "rag_chunks",
+            "rag_documents"
+        ]
+        for tbl in legacy_tables:
+            try:
+                await conn.execute(text(f"DROP TABLE IF EXISTS {tbl} CASCADE;"))
+            except Exception as e:
+                print(f"[DB] Notice dropping legacy table {tbl}: {e}")
+
+        await conn.run_sync(Base.metadata.create_all)
+        print("[DB] Initialized clean knowledge base and chat session tables successfully.")

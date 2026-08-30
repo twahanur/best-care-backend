@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { AiProxyService } from './ai-proxy.service';
 import { AgentChatDto } from './dto/agent-chat.dto';
@@ -8,6 +8,7 @@ import { JwtAuthGuard } from '../../common/security/jwt-auth.guard';
 import { RolesGuard } from '../../common/security/roles.guard';
 import { Roles } from '../../common/security/roles.decorator';
 import { Public } from '../../common/security/public.decorator';
+import { CurrentUser, AuthenticatedUser } from '../../common/security/current-user.decorator';
 
 @ApiTags('AI & RAG Services')
 @Controller('ai')
@@ -17,10 +18,29 @@ export class AiProxyController {
 
   @Public()
   @Post('chat')
-  @ApiOperation({ summary: 'Agentic Multilingual Chat with Conversational Memory & PostgreSQL RAG Grounding' })
-  @ApiResponse({ status: 200, description: 'Agentic AI response with memory perspective and source citations' })
-  agenticChat(@Body() dto: AgentChatDto) {
-    return this.aiProxyService.agenticChat(dto);
+  @ApiOperation({ summary: 'Agentic Multilingual Chat with Conversational Booking, SQL Grounding & Vector Search' })
+  @ApiResponse({ status: 200, description: 'Grounded response with live SQL query results or conversational booking steps' })
+  agenticChat(
+    @Body() dto: AgentChatDto,
+    @CurrentUser() currentUser?: AuthenticatedUser,
+    @Req() req?: any
+  ) {
+    const authHeader = req?.headers?.authorization;
+    return this.aiProxyService.agenticChat(dto, currentUser, authHeader);
+  }
+
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  @Post('admin/chat')
+  @ApiOperation({ summary: 'Admin Fleet & Revenue Analytics Chat' })
+  @ApiResponse({ status: 200, description: 'Admin analytics grounded response' })
+  adminChat(
+    @Body() dto: AgentChatDto,
+    @CurrentUser() currentUser?: AuthenticatedUser,
+    @Req() req?: any
+  ) {
+    const authHeader = req?.headers?.authorization;
+    return this.aiProxyService.agenticChat({ ...dto, category: 'admin' }, currentUser || { id: 'usr_admin_1', role: 'ADMIN', email: 'admin@bestcare.com' }, authHeader);
   }
 
   @Public()

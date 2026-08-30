@@ -1,57 +1,52 @@
-"""
-Hybrid Retriever with Reciprocal Rank Fusion (RRF).
-Merges semantic vector retrieval and lexical keyword retrieval for high recall and precision.
-"""
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, List, Optional
+from app.retrieval.sql_executor import sql_executor
 from app.retrieval.semantic_retriever import semantic_retriever
-from app.retrieval.keyword_retriever import keyword_retriever
-from app.retrieval.metadata_filter import metadata_filter
-from app.core.config import settings
+from app.query.query_planner import QueryPlan
 
 class HybridRetriever:
     @classmethod
     async def retrieve(
         cls,
-        query: str,
-        category: Optional[str] = None,
-        constraints: Optional[Dict[str, Any]] = None,
-        top_k: int = 10
-    ) -> List[Dict[str, Any]]:
-        # 1. Parallel / sequential execution of semantic and keyword search
-        semantic_docs = await semantic_retriever.retrieve(query, top_k=settings.MAX_CANDIDATES, category=category)
-        keyword_docs = await keyword_retriever.retrieve(query, top_k=settings.MAX_CANDIDATES, category=category)
+        plan: QueryPlan,
+        user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Executes required retrieval paths (SQL and/or Semantic Vector) based on QueryPlan.
+        """
+        sql_data: List[Dict[str, Any]] = []
+        vector_docs: List[Dict[str, Any]] = []
+        sources: List[Dict[str, Any]] = []
 
-        # 2. Compute RRF scores
-        rrf_k = settings.RRF_K
-        doc_map: Dict[str, Dict[str, Any]] = {}
-        rrf_scores: Dict[str, float] = {}
+        # 1. Execute SQL if planned
+        if plan.requires_sql and plan.sql_template_name:
+            sql_data = await sql_executor.execute_template(
+                template_name=plan.sql_template_name,
+                params=plan.entities,
+                user_id=user_id
+            )
+            if sql_data:
+                sources.append({
+                    "type": "database",
+                    "template": plan.sql_template_name,
+                    "record_count": len(sql_data)
+                })
 
-        for rank, doc in enumerate(semantic_docs, 1):
-            doc_id = doc["id"]
-            doc_map[doc_id] = doc
-            rrf_scores[doc_id] = rrf_scores.get(doc_id, 0.0) + (1.0 / (rrf_k + rank))
+        # 2. Execute Vector Search if planned
+        if plan.requires_vector:
+            vector_docs = await semantic_retriever.retrieve(
+                query=plan.query,
+                top_k=3
+            )
+            if vector_docs:
+                sources.append({
+                    "type": "vector_knowledge_base",
+                    "doc_count": len(vector_docs)
+                })
 
-        for rank, doc in enumerate(keyword_docs, 1):
-            doc_id = doc["id"]
-            if doc_id not in doc_map:
-                doc_map[doc_id] = doc
-            rrf_scores[doc_id] = rrf_scores.get(doc_id, 0.0) + (1.0 / (rrf_k + rank))
-
-        # 3. Assemble merged candidates
-        merged_candidates = []
-        for doc_id, doc in doc_map.items():
-            candidate = dict(doc)
-            candidate["rrf_score"] = rrf_scores[doc_id]
-            candidate["similarity_score"] = doc.get("score", 0.0)
-            merged_candidates.append(candidate)
-
-        # Sort by RRF score descending
-        merged_candidates.sort(key=lambda x: x["rrf_score"], reverse=True)
-
-        # 4. Apply metadata filtering if constraints are present
-        if constraints:
-            merged_candidates = metadata_filter.apply(merged_candidates, constraints)
-
-        return merged_candidates[:top_k]
+        return {
+            "sql_data": sql_data,
+            "vector_docs": vector_docs,
+            "sources": sources
+        }
 
 hybrid_retriever = HybridRetriever()

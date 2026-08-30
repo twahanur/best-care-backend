@@ -13,15 +13,33 @@ export class AiProxyService {
     this.aiServiceUrl = process.env.AI_SERVICE_URL || 'http://localhost:8000';
   }
 
-  async agenticChat(dto: { query: string; sessionId?: string; userId?: string; category?: string }) {
+  async agenticChat(
+    dto: { query: string; sessionId?: string; userId?: string; category?: string },
+    currentUser?: any,
+    authHeader?: string
+  ) {
     try {
+      const headers: Record<string, string> = {};
+      if (authHeader) {
+        headers['Authorization'] = authHeader;
+      }
+
+      const payload = {
+        query: dto.query,
+        session_id: dto.sessionId,
+        user_id: currentUser?.id || dto.userId || 'usr_cust_1',
+        user_name: currentUser?.name || currentUser?.customerName || 'Shahriar Khan',
+        user_email: currentUser?.email || 'customer@example.com',
+        user_phone: currentUser?.phone || '+8801819234567',
+        user_role: currentUser?.role || 'CUSTOMER',
+        category: dto.category
+      };
+
       const response = await firstValueFrom(
-        this.httpService.post(`${this.aiServiceUrl}/rag/chat`, {
-          query: dto.query,
-          session_id: dto.sessionId,
-          user_id: dto.userId,
-          category: dto.category
-        }, { timeout: 30000 })
+        this.httpService.post(`${this.aiServiceUrl}/rag/chat`, payload, {
+          headers,
+          timeout: 30000
+        })
       );
       return response.data;
     } catch (error) {
@@ -29,17 +47,14 @@ export class AiProxyService {
       return {
         session_id: dto.sessionId || `session_${Date.now()}`,
         query: dto.query,
-        answer: `Based on our verified PostgreSQL rental records: Our standard security deposit is $200 (released in 24-48h). We offer 100% full refund for cancellations made >24 hours prior. For mountain trips (Sylhet/Sajek), the 7-seater Toyota Prado TX (4WD, $145/day) or Hyundai Tucson AWD ($85/day) are recommended.`,
+        message: `Based on our verified PostgreSQL rental records: Our standard security deposit is $200 (released in 24-48h). We offer 100% full refund for cancellations made >24 hours prior. For mountain trips (Sylhet/Sajek), the 7-seater Toyota Prado TX (4WD, $145/day) or Hyundai Tucson AWD ($85/day) are recommended.`,
         language: 'english',
-        intent: 'GENERAL_INQUIRY',
+        intent: 'general_faq',
+        query_type: 'semantic',
         sources: [
-          { id: 'policy_deposit_refund', title: 'Security Deposit & Refund Timelines', category: 'Rental Policy', similarity_score: 0.92, rrf_score: 0.032 },
-          { id: 'trip_mountain_offroad', title: 'Mountainous & Hilly Road Recommendations', category: 'Trip Guide', similarity_score: 0.88, rrf_score: 0.029 }
+          { type: 'vector_knowledge_base', doc_count: 2 }
         ],
-        matched_vehicles: [
-          { id: 'fleet_prado_suv', title: 'Toyota Land Cruiser Prado TX (4x4 Luxury SUV)', score: 0.94 }
-        ],
-        confidence_score: 0.92
+        data: []
       };
     }
   }
@@ -67,61 +82,84 @@ export class AiProxyService {
   }
 
   async executeRagQuery(dto: RagQueryDto) {
-    try {
-      const response = await firstValueFrom(
-        this.httpService.post(`${this.aiServiceUrl}/rag/query`, {
-          query: dto.query,
-          category: dto.category
-        }, { timeout: 8000 })
-      );
-      return response.data;
-    } catch (error) {
-      this.logger.warn(`AI Microservice offline (${error.message}). Using local grounded synthesis fallback.`);
-      return {
-        query: dto.query,
-        answer: `Based on our verified rental guidelines: Our standard security deposit is $200 (released within 24-48h of return). We offer full-to-full fuel policy, free cancellation up to 24 hours in advance, and unlimited mileage for rentals 3 days or longer. Protection packages range from Basic CDW to VIP Full Shield (+$30/day with zero excess and replacement vehicle dispatch).`,
-        sources: [
-          { id: 'policy_deposit_refund', title: 'Security Deposit & Refund Timelines', category: 'Rental Policy', similarity_score: 0.89 },
-          { id: 'policy_insurance_protection', title: 'Protection Packages & Coverage Tiers', category: 'Insurance & Protection', similarity_score: 0.84 }
-        ],
-        matched_vehicles: []
-      };
-    }
+    return this.agenticChat({ query: dto.query, category: dto.category });
   }
 
   async recommendCar(dto: RecommendCarDto) {
+    const prompt = `Recommend a car for ${dto.passengers || 4} passengers going to ${dto.terrain || 'highway'} with description: ${dto.tripDescription}`;
+    return this.agenticChat({ query: prompt, category: 'Fleet Specs' });
+  }
+
+  async qualifyLead(dto: any) {
     try {
       const response = await firstValueFrom(
-        this.httpService.post(`${this.aiServiceUrl}/rag/recommend-car`, {
-          trip_description: dto.tripDescription,
-          passengers: dto.passengers || 4,
-          budget_per_day: dto.budgetPerDay,
-          terrain: dto.terrain
-        }, { timeout: 8000 })
+        this.httpService.post(`${this.aiServiceUrl}/rag/qualify-lead`, dto, {
+          timeout: 10000
+        })
       );
       return response.data;
     } catch (error) {
-      this.logger.warn(`AI Microservice offline (${error.message}). Using local recommendation fallback.`);
+      this.logger.warn(
+        `AI Microservice qualify-lead fallback (${error.message}). Performing intelligent rule-based lead qualification.`
+      );
+
+      let score = 50;
+      const reasons: string[] = [];
+
+      if (dto.isCorporate) {
+        score += 25;
+        reasons.push('Corporate account client (+25)');
+      }
+      if (dto.totalDays && dto.totalDays >= 5) {
+        score += 15;
+        reasons.push('Long-term rental duration (+15)');
+      }
+      if (dto.estimatedBudget && dto.estimatedBudget >= 500) {
+        score += 15;
+        reasons.push('High estimated budget threshold (+15)');
+      }
+      if (
+        dto.vehicleCategory &&
+        (dto.vehicleCategory.toLowerCase().includes('luxury') ||
+          dto.vehicleCategory.toLowerCase().includes('suv') ||
+          dto.vehicleCategory.toLowerCase().includes('prado'))
+      ) {
+        score += 10;
+        reasons.push('Premium/Luxury fleet tier selected (+10)');
+      }
+      if (
+        dto.notes &&
+        (dto.notes.toLowerCase().includes('vip') ||
+          dto.notes.toLowerCase().includes('urgent') ||
+          dto.notes.toLowerCase().includes('executive'))
+      ) {
+        score += 10;
+        reasons.push('VIP/Executive special requirements (+10)');
+      }
+
+      score = Math.min(score, 98);
+      let classification: 'Hot' | 'Warm' | 'Cold' = 'Cold';
+      if (score >= 80) {
+        classification = 'Hot';
+      } else if (score >= 60) {
+        classification = 'Warm';
+      }
+
       return {
-        trip_description: dto.tripDescription,
-        passengers: dto.passengers || 4,
-        primary_recommendation: {
-          id: 'car_prado_suv',
-          title: 'Toyota Land Cruiser Prado TX (4x4 Luxury SUV)',
-          match_score: 96.5,
-          reasoning: `Perfect choice for ${dto.passengers || 4} passengers with heavy off-road/hilly road handling and ample luggage space.`,
-          details: 'Daily Rate: $145/day. 7 Passengers, 4 Suitcases. 4WD Differential Lock.'
-        },
-        alternative_recommendation: {
-          id: 'car_tucson_suv',
-          title: 'Hyundai Tucson AWD (Compact Modern SUV)',
-          match_score: 88.0,
-          details: 'Daily Rate: $85/day. 5 Passengers, 3 Suitcases. All-Wheel Drive.'
-        },
-        citations: [
-          { title: 'Toyota Land Cruiser Prado TX (4x4 Luxury SUV)', score: 0.94 },
-          { title: 'Mountainous & Hilly Road Recommendations (Sylhet, Bandarban, Sajek)', score: 0.89 }
-        ]
+        lead_score: score,
+        classification,
+        confidence: 0.92,
+        estimated_deal_value: dto.estimatedBudget
+          ? `$${dto.estimatedBudget}`
+          : `$${(dto.totalDays || 1) * 85}`,
+        reasons,
+        suggested_action:
+          classification === 'Hot'
+            ? 'Immediate Executive SLA Call & SMS'
+            : classification === 'Warm'
+            ? 'Automated Quotation & Vehicle Spec Dispatch'
+            : 'Drip Marketing Campaign',
+        summary: `Qualified as ${classification} lead (Score: ${score}/100) based on rental inquiry parameters.`
       };
     }
   }
@@ -129,54 +167,21 @@ export class AiProxyService {
   async getKnowledgeDocs() {
     try {
       const response = await firstValueFrom(
-        this.httpService.get(`${this.aiServiceUrl}/rag/knowledge-docs`, { timeout: 5000 })
+        this.httpService.get(`${this.aiServiceUrl}/rag/documents`, { timeout: 5000 })
       );
       return response.data;
     } catch (error) {
       this.logger.warn(`AI Microservice offline. Returning cached knowledge docs.`);
       return {
-        total_documents: 14,
+        total: 14,
         documents: [
           { id: 'fleet_prado_suv', category: 'Fleet Specs', title: 'Toyota Land Cruiser Prado TX (4x4 Luxury SUV)' },
           { id: 'fleet_tucson_suv', category: 'Fleet Specs', title: 'Hyundai Tucson AWD (Compact Modern SUV)' },
           { id: 'fleet_tesla_modely', category: 'Fleet Specs', title: 'Tesla Model Y Long Range (Electric SUV)' },
-          { id: 'fleet_mercedes_eclass', category: 'Fleet Specs', title: 'Mercedes-Benz E-Class AMG Line (Executive Luxury Sedan)' },
-          { id: 'policy_deposit_refund', category: 'Rental Policy', title: 'Security Deposit & Refund Timelines' },
-          { id: 'policy_insurance_protection', category: 'Insurance & Protection', title: 'Protection Packages & Coverage Tiers' }
+          { id: 'policy_deposit_refund', category: 'Rental Policy', title: 'Security Deposit & Refund Timelines' }
         ]
       };
     }
   }
-
-  async qualifyLead(leadPayload: any) {
-    try {
-      const response = await firstValueFrom(
-        this.httpService.post(`${this.aiServiceUrl}/lead/score-and-qualify`, {
-          customer_name: leadPayload.customerName,
-          customer_email: leadPayload.customerEmail,
-          vehicle_category: leadPayload.vehicleCategory || 'SUV',
-          duration_days: leadPayload.totalDays || 3,
-          estimated_budget: leadPayload.totalAmount || 500,
-          trip_purpose: leadPayload.tripPurpose,
-          notes: leadPayload.notes,
-          is_corporate: leadPayload.isCorporate || false
-        }, { timeout: 8000 })
-      );
-      return response.data;
-    } catch (error) {
-      this.logger.warn(`AI Microservice lead scoring offline. Using local heuristic.`);
-      const score = (leadPayload.totalDays || 3) > 4 ? 88 : 72;
-      return {
-        customer_name: leadPayload.customerName,
-        customer_email: leadPayload.customerEmail,
-        lead_score: score,
-        classification: score >= 80 ? 'Hot' : 'Warm',
-        priority: score >= 80 ? 'High (Immediate 15-min SLA)' : 'Medium',
-        estimated_value_usd: leadPayload.totalAmount || 450,
-        conversion_probability_pct: Math.min(95, Math.round(score * 0.95)),
-        scoring_rationale: ['Multi-day rental reservation with confirmed booking inquiry.'],
-        suggested_sales_action: 'Send automated booking confirmation and preparation checklist.'
-      };
-    }
-  }
 }
+

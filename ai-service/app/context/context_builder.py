@@ -1,36 +1,46 @@
-"""
-Context Builder and Token Budget Manager.
-Deduplicates, compresses, and formats grounded evidence context with precise source citations.
-"""
-from typing import List, Dict, Any
+import json
+from typing import List, Dict, Any, Optional
 
 class ContextBuilder:
     @staticmethod
-    def build(documents: List[Dict[str, Any]], max_chars: int = 4000) -> str:
-        if not documents:
-            return "No relevant database documents found."
+    def build_context_string(
+        sql_data: List[Dict[str, Any]],
+        vector_docs: List[Dict[str, Any]],
+        recent_messages: List[Dict[str, Any]],
+        user_info: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """
+        Synthesizes SQL database results, vector knowledge documents, and previous chat turns.
+        """
+        sections = []
 
-        seen_docs = set()
-        formatted_chunks = []
-        total_len = 0
+        # 1. User Profile Context
+        if user_info:
+            sections.append(f"=== AUTHENTICATED USER ===\nName: {user_info.get('name', 'User')}, Role: {user_info.get('role', 'CUSTOMER')}, Email: {user_info.get('email', 'N/A')}")
 
-        for i, doc in enumerate(documents, 1):
-            doc_id = doc.get("id", f"doc_{i}")
-            if doc_id in seen_docs:
-                continue
-            seen_docs.add(doc_id)
+        # 2. Live Database Facts (Source of Truth)
+        if sql_data:
+            sql_str = "=== LIVE DATABASE RECORDS (POSTGRESQL TRUTH) ===\n"
+            for i, row in enumerate(sql_data[:10], 1):
+                sql_str += f"Record #{i}: {json.dumps(row, default=str)}\n"
+            sections.append(sql_str)
 
-            chunk_text = (
-                f"[Source #{i} | {doc.get('category', 'Info')} - {doc.get('title', 'Document')}]\n"
-                f"{doc.get('content', '')}"
-            )
+        # 3. Knowledge Base Documents
+        if vector_docs:
+            kb_str = "=== OFFICIAL KNOWLEDGE BASE DOCUMENTS ===\n"
+            for i, doc in enumerate(vector_docs[:4], 1):
+                kb_str += f"Doc #{i} [{doc.get('category')} - {doc.get('title')}]: {doc.get('content')}\n"
+            sections.append(kb_str)
 
-            if total_len + len(chunk_text) > max_chars and formatted_chunks:
-                break
+        # 4. Recent Conversation History
+        if recent_messages:
+            hist_str = "=== RECENT CONVERSATION HISTORY ===\n"
+            for m in recent_messages[-6:]:
+                role = m.get("role", "user").upper()
+                content = m.get("content", "")
+                hist_str += f"{role}: {content}\n"
+            sections.append(hist_str)
 
-            formatted_chunks.append(chunk_text)
-            total_len += len(chunk_text)
-
-        return "\n\n".join(formatted_chunks)
+        return "\n\n".join(sections) if sections else "No special database context found."
 
 context_builder = ContextBuilder()

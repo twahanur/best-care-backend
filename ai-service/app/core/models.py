@@ -1,113 +1,105 @@
-"""
-Database Models for PostgreSQL RAG Knowledge Base, Embeddings, Jobs, and Conversational Memory.
-"""
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
-from sqlalchemy import (
-    Column, String, Text, Integer, Float, Boolean, DateTime, ForeignKey, JSON
-)
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy import String, Text, Boolean, Integer, Float, JSON, DateTime, ForeignKey, Index
+from sqlalchemy.orm import declarative_base, Mapped, mapped_column, relationship
+from pgvector.sqlalchemy import Vector
+from app.core.config import settings
 
 Base = declarative_base()
 
-def get_utc_now():
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+def get_utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 class KnowledgeDocument(Base):
-    __tablename__ = "rag_documents"
+    __tablename__ = "knowledge_documents"
 
-    id = Column(String(128), primary_key=True, index=True)
-    entity_type = Column(String(64), nullable=False, default="general", index=True)
-    entity_id = Column(String(128), nullable=True, index=True)
-    category = Column(String(64), nullable=False, index=True)
-    title = Column(String(256), nullable=False)
-    content = Column(Text, nullable=False)
-    canonical_text = Column(Text, nullable=False)
-    tags = Column(JSON, nullable=False, default=list)
-    metadata_json = Column(JSON, nullable=False, default=dict)
-    content_hash = Column(String(64), nullable=False, index=True)
-    is_active = Column(Boolean, default=True, index=True)
-    created_at = Column(DateTime, default=get_utc_now)
-    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now)
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    entity_type: Mapped[str] = mapped_column(String(32), index=True, default="general")
+    entity_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    category: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    content: Mapped[str] = mapped_column(Text)
+    canonical_text: Mapped[str] = mapped_column(Text)
+    tags: Mapped[Optional[List[str]]] = mapped_column(JSON, default=list)
+    metadata_json: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, default=dict)
+    content_hash: Mapped[str] = mapped_column(String(64), index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_utc_now, onupdate=get_utc_now)
 
-    chunks = relationship("RAGChunk", back_populates="document", cascade="all, delete-orphan")
-    embeddings = relationship("RAGEmbedding", back_populates="document", cascade="all, delete-orphan")
+    chunks: Mapped[List["KnowledgeChunk"]] = relationship("KnowledgeChunk", back_populates="document", cascade="all, delete-orphan")
+    embeddings: Mapped[List["KnowledgeEmbedding"]] = relationship("KnowledgeEmbedding", back_populates="document", cascade="all, delete-orphan")
 
-class RAGChunk(Base):
-    __tablename__ = "rag_chunks"
+class KnowledgeChunk(Base):
+    __tablename__ = "knowledge_chunks"
 
-    id = Column(String(128), primary_key=True, index=True)
-    document_id = Column(String(128), ForeignKey("rag_documents.id", ondelete="CASCADE"), nullable=False, index=True)
-    chunk_index = Column(Integer, nullable=False, default=0)
-    chunk_text = Column(Text, nullable=False)
-    token_count = Column(Integer, default=0)
-    created_at = Column(DateTime, default=get_utc_now)
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    document_id: Mapped[str] = mapped_column(String(64), ForeignKey("knowledge_documents.id", ondelete="CASCADE"), index=True)
+    chunk_index: Mapped[int] = mapped_column(Integer, default=0)
+    chunk_text: Mapped[str] = mapped_column(Text)
+    token_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_utc_now)
 
-    document = relationship("KnowledgeDocument", back_populates="chunks")
-    embeddings = relationship("RAGEmbedding", back_populates="chunk", cascade="all, delete-orphan")
+    document: Mapped["KnowledgeDocument"] = relationship("KnowledgeDocument", back_populates="chunks")
+    embeddings: Mapped[List["KnowledgeEmbedding"]] = relationship("KnowledgeEmbedding", back_populates="chunk", cascade="all, delete-orphan")
 
-class RAGEmbedding(Base):
-    __tablename__ = "rag_embeddings"
+class KnowledgeEmbedding(Base):
+    __tablename__ = "knowledge_embeddings"
 
-    id = Column(String(128), primary_key=True, index=True)
-    document_id = Column(String(128), ForeignKey("rag_documents.id", ondelete="CASCADE"), nullable=False, index=True)
-    chunk_id = Column(String(128), ForeignKey("rag_chunks.id", ondelete="CASCADE"), nullable=True, index=True)
-    embedding_model = Column(String(64), nullable=False)
-    embedding_version = Column(String(32), nullable=False, default="v1", index=True)
-    embedding_vector = Column(JSON, nullable=False)  # List[float] stored as JSON array for cross-DB compatibility
-    status = Column(String(32), nullable=False, default="ACTIVE", index=True)  # ACTIVE, INACTIVE, PENDING
-    embedded_at = Column(DateTime, default=get_utc_now)
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    document_id: Mapped[str] = mapped_column(String(64), ForeignKey("knowledge_documents.id", ondelete="CASCADE"), index=True)
+    chunk_id: Mapped[str] = mapped_column(String(64), ForeignKey("knowledge_chunks.id", ondelete="CASCADE"), index=True)
+    embedding_model: Mapped[str] = mapped_column(String(64), default=settings.EMBEDDING_MODEL)
+    embedding_vector: Mapped[List[float]] = mapped_column(Vector(settings.EMBEDDING_DIMENSION))
+    status: Mapped[str] = mapped_column(String(20), default="ACTIVE", index=True)
+    embedded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_utc_now)
 
-    document = relationship("KnowledgeDocument", back_populates="embeddings")
-    chunk = relationship("RAGChunk", back_populates="embeddings")
+    document: Mapped["KnowledgeDocument"] = relationship("KnowledgeDocument", back_populates="embeddings")
+    chunk: Mapped["KnowledgeChunk"] = relationship("KnowledgeChunk", back_populates="embeddings")
 
 class EmbeddingJob(Base):
     __tablename__ = "embedding_jobs"
 
-    id = Column(String(128), primary_key=True, index=True)
-    document_id = Column(String(128), nullable=False, index=True)
-    action = Column(String(32), default="INDEX")  # INDEX, REINDEX, DELETE
-    status = Column(String(32), default="PENDING", index=True)  # PENDING, PROCESSING, COMPLETED, FAILED, RETRYING
-    attempts = Column(Integer, default=0)
-    max_attempts = Column(Integer, default=3)
-    error_message = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=get_utc_now)
-    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now)
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    document_id: Mapped[str] = mapped_column(String(64), index=True)
+    action: Mapped[str] = mapped_column(String(32), default="INDEX")
+    status: Mapped[str] = mapped_column(String(20), default="PENDING", index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=3)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_utc_now, onupdate=get_utc_now)
 
-class ChatConversation(Base):
-    __tablename__ = "chat_conversations"
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
 
-    id = Column(String(128), primary_key=True, index=True)  # session_id
-    user_id = Column(String(128), nullable=True, index=True)
-    title = Column(String(256), default="New Conversation")
-    summary = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=get_utc_now)
-    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now)
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    user_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    user_email: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    user_phone: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    user_role: Mapped[Optional[str]] = mapped_column(String(32), default="CUSTOMER")
+    title: Mapped[str] = mapped_column(String(255), default="Car Rental Inquiry Session")
+    booking_state_json: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, default=dict)
+    metadata_json: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_utc_now, onupdate=get_utc_now)
 
-    messages = relationship("ChatMessage", back_populates="conversation", cascade="all, delete-orphan", order_by="ChatMessage.created_at")
+    messages: Mapped[List["ChatMessage"]] = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan", order_by="ChatMessage.created_at")
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
-    id = Column(String(128), primary_key=True, index=True)
-    conversation_id = Column(String(128), ForeignKey("chat_conversations.id", ondelete="CASCADE"), nullable=False, index=True)
-    role = Column(String(32), nullable=False)  # user, assistant, system
-    content = Column(Text, nullable=False)
-    language = Column(String(32), default="english")  # english, bangla, banglish, mixed
-    intent = Column(String(64), nullable=True)
-    sources_json = Column(JSON, default=list)
-    matched_vehicles_json = Column(JSON, default=list)
-    created_at = Column(DateTime, default=get_utc_now)
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), ForeignKey("chat_sessions.id", ondelete="CASCADE"), index=True)
+    role: Mapped[str] = mapped_column(String(20)) # 'user' | 'assistant' | 'system'
+    content: Mapped[str] = mapped_column(Text)
+    language: Mapped[str] = mapped_column(String(20), default="english")
+    intent: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    query_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    sources_json: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(JSON, default=list)
+    data_json: Mapped[Optional[Any]] = mapped_column(JSON, default=list)
+    booking_action_json: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_utc_now, index=True)
 
-    conversation = relationship("ChatConversation", back_populates="messages")
-
-class UserMemory(Base):
-    __tablename__ = "user_memories"
-
-    id = Column(String(128), primary_key=True, index=True)
-    user_id = Column(String(128), nullable=False, index=True)
-    preference_key = Column(String(128), nullable=False)
-    preference_value = Column(Text, nullable=False)
-    confidence = Column(Float, default=1.0)
-    created_at = Column(DateTime, default=get_utc_now)
-    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now)
+    session: Mapped["ChatSession"] = relationship("ChatSession", back_populates="messages")

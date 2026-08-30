@@ -1,38 +1,34 @@
-"""
-Multilingual Language Detector.
-Identifies whether user input is English, Bengali script (বাংলা), Banglish (phonetic Latin), or Mixed.
-"""
 import re
-
-BANGLISH_MARKERS = {
-    "amar", "amader", "apnader", "koto", "lagbe", "gari", "gaari", "bhara", "jonno",
-    "niye", "jabo", "korte", "hobe", "pahar", "pahari", "sajek", "sylhet", "taka",
-    "ache", "thakbe", "bhalo", "chai", "dorkar", "khujchi", "dekhun", "bolun", "din",
-    "diner", "kivabe", "kotodur", "bima", "shathe", "shob", "ekta"
-}
 
 class LanguageDetector:
     @staticmethod
     def detect(text: str) -> str:
-        if not text or not text.strip():
+        """
+        Detects if input is Bengali script ('bangla'), Banglish ('banglish'), or English ('english').
+        """
+        if not text:
             return "english"
 
-        cleaned = text.strip().lower()
-        words = re.findall(r"\b[a-z0-9_'-]+\b|[\u0980-\u09ff]+", cleaned)
-        
-        has_bengali_script = bool(re.search(r"[\u0980-\u09ff]", cleaned))
-        has_latin_script = bool(re.search(r"[a-z]", cleaned))
-
-        # Check for Banglish vocabulary
-        banglish_hits = sum(1 for w in words if w in BANGLISH_MARKERS)
-        
-        if has_bengali_script and has_latin_script:
-            return "mixed"
-        elif has_bengali_script:
+        # Check for Bengali Unicode character block (U+0980 to U+09FF)
+        if re.search(r"[\u0980-\u09ff]", text):
             return "bangla"
-        elif banglish_hits >= 1 or (len(words) > 0 and (banglish_hits / len(words)) >= 0.15):
+
+        # Check for characteristic Banglish tokens & suffixes
+        banglish_markers = [
+            "gari", "gaari", "lagbe", "koto", "bhara", "jonno", "koro", "korbo", "hobe",
+            "ache", "dekhao", "amader", "amar", "tarik", "agamikal", "kalke", "poroshu",
+            "sokal", "bikal", "shondha", "raat", "tay", "te", "theke", "jabo", "thik",
+            "haan", "na", "bhalo", "diner", "khoroch", "pabo", "dibo", "chai", "dorkar",
+            "kothay", "ekta", "duita", "tinta", "sonadanga", "sajek", "bandarban"
+        ]
+
+        text_lower = text.lower()
+        tokens = set(re.findall(r"\b[a-z]{2,}\b", text_lower))
+        matching_count = sum(1 for marker in banglish_markers if marker in tokens or marker in text_lower)
+
+        if matching_count >= 1:
             return "banglish"
-        else:
-            return "english"
+
+        return "english"
 
 language_detector = LanguageDetector()

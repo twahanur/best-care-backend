@@ -1,47 +1,43 @@
 import os
-from pydantic import BaseModel
+from typing import List
+from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
 from dotenv import load_dotenv
 
 load_dotenv()
 
-class Settings(BaseModel):
-    PROJECT_NAME: str = "Enterprise Car Rental Production Agentic RAG Microservice"
-    VERSION: str = "2.0.0"
-    API_PREFIX: str = ""
-    HOST: str = os.getenv("AI_SERVICE_HOST", "0.0.0.0")
-    PORT: int = int(os.getenv("AI_SERVICE_PORT", "8000"))
-    
-    # Database Configuration
+class Settings(BaseSettings):
+    # App Settings
+    AI_SERVICE_HOST: str = os.getenv("AI_SERVICE_HOST", "0.0.0.0")
+    AI_SERVICE_PORT: int = int(os.getenv("AI_SERVICE_PORT", "8000"))
+    AI_SERVICE_ENV: str = os.getenv("AI_SERVICE_ENV", "production")
+    BACKEND_GATEWAY_URL: str = os.getenv("BACKEND_GATEWAY_URL", "http://localhost:4000")
+
+    # PostgreSQL Database URL
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL",
-        "postgresql+asyncpg://postgres:postgrespassword@localhost:5432/digitalpylot_db"
+        "postgresql+asyncpg://neondb_owner:npg_MHut8IFrl6Vq@ep-still-flower-ao4zszco-pooler.c-2.ap-southeast-1.aws.neon.tech/best_car?ssl=require"
     )
-    SQLITE_FALLBACK_URL: str = "sqlite+aiosqlite:///:memory:"
-    
-    # Google Gemini API Configuration
+
+    # Google Gemini GenAI Settings
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.7-flash")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
     GEMINI_FALLBACK_MODELS: str = os.getenv(
         "GEMINI_FALLBACK_MODELS",
-        "gemini-3.6-flash,gemini-3.5-flash,gemini-flash-latest,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-lite-latest"
+        "gemini-2.0-flash,gemini-1.5-flash,gemini-1.5-flash-8b,gemini-2.0-flash-exp"
     )
     EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
-    EMBEDDING_VERSION: str = "v1"
-    EMBEDDING_DIMENSION: int = 256  # Fallback semantic dimension, 768 for Gemini text-embedding-004
-    
-    # RAG Retrieval Parameters
+    EMBEDDING_DIMENSION: int = 768
+
+    # RAG Retrieval & Memory Tuning
     TOP_K_RETRIEVAL: int = 5
-    FINAL_TOP_K: int = 5
-    MAX_CANDIDATES: int = 20
-    SIMILARITY_THRESHOLD: float = 0.25
-    RRF_K: int = 60  # Reciprocal Rank Fusion constant
-    MAX_RETRIEVAL_ITERATIONS: int = 2
-    
-    # Conversational Memory
     MAX_HISTORY_TURNS: int = 10
-    
-    # Background Workers
-    BACKGROUND_WORKERS_COUNT: int = 2
-    WORKER_POLL_INTERVAL: float = 0.5
+    MAX_CONTEXT_CHARS: int = 4000
+
+    @property
+    def fallback_model_list(self) -> List[str]:
+        return [m.strip() for m in self.GEMINI_FALLBACK_MODELS.split(",") if m.strip()]
+
+    model_config = ConfigDict(extra="allow", case_sensitive=True)
 
 settings = Settings()
