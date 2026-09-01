@@ -28,10 +28,9 @@ export class AiProxyService {
     this.geminiApiKey = process.env.GEMINI_API_KEY || '';
     this.geminiModels = [
       process.env.GEMINI_MODEL || 'gemini-3.6-flash',
+      'gemini-3.5-flash-lite',
       'gemini-3.5-flash',
-      'gemini-3.7-flash',
-      'gemini-2.5-flash-lite',
-      'gemini-1.5-flash'
+      'gemini-3.7-flash'
     ];
   }
 
@@ -65,7 +64,7 @@ export class AiProxyService {
       const response = await firstValueFrom(
         this.httpService.post(`${this.aiServiceUrl}/rag/chat`, payload, {
           headers,
-          timeout: 4000
+          timeout: 25000
         })
       );
       const d = response.data;
@@ -88,7 +87,7 @@ export class AiProxyService {
       };
     } catch (microserviceErr: any) {
       this.logger.log(
-        `Standalone AI Microservice offline (${microserviceErr.message}). Engaging Gateway Direct Gemini & Fleet RAG Engine.`
+        `Standalone AI Microservice notice (${microserviceErr.message}). Engaging Gateway Direct Gemini & Fleet RAG Engine.`
       );
     }
 
@@ -142,6 +141,25 @@ export class AiProxyService {
       );
     }
 
+    // Detect booking action in fallback
+    let bookingAction: any = null;
+    const qLower = query.toLowerCase();
+    if (qLower.includes('book') || qLower.includes('reserve') || qLower.includes('rent')) {
+      const topCar = matchedCars[0];
+      if (topCar) {
+        bookingAction = {
+          status: 'collecting',
+          collected: {
+            car_id: topCar.id,
+            car_name: topCar.name,
+            daily_rate: topCar.dailyRate,
+            category: topCar.category
+          },
+          missing: ['pickup_date', 'pickup_location']
+        };
+      }
+    }
+
     return {
       session_id: sessionId,
       query,
@@ -164,6 +182,7 @@ export class AiProxyService {
         currentHub: typeof c.currentHub === 'object' && c.currentHub !== null ? (c.currentHub as any).name : c.currentHub,
         status: c.status
       })),
+      booking_action: bookingAction,
       data: matchedCars.slice(0, 3).map((c) => ({
         id: `doc_${c.id}`,
         title: `${c.brand} ${c.name} (${c.category.toUpperCase()})`,
@@ -183,14 +202,14 @@ export class AiProxyService {
   ): Promise<string> {
     const history = this.sessionStore.get(sessionId) || [];
     const historyStr = history
-      .slice(-6)
-      .map((h) => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.content}`)
+      .slice(-8)
+      .map((h) => `${h.role === 'user' ? 'Customer' : 'Assistant'}: ${h.content}`)
       .join('\n');
 
     const fleetCatalog = cars
       .map(
         (c) =>
-          `• [${c.id}] ${c.name} | Cat: ${c.category} | Rate: $${c.dailyRate}/day | Deposit: $${c.securityDeposit} | Seats: ${c.seats} | Fuel: ${c.fuelType} | Hub: ${typeof c.currentHub === 'object' && c.currentHub !== null ? (c.currentHub as any).name : c.currentHub} | Status: ${c.status} | Rating: ⭐${c.ratingAverage} | Features: ${c.features.join(', ')}`
+          `• [${c.id}] ${c.name} | Brand: ${c.brand} | Cat: ${c.category} | Rate: $${c.dailyRate}/day | Deposit: $${c.securityDeposit} | Seats: ${c.seats} | Fuel: ${c.fuelType} | Hub: ${typeof c.currentHub === 'object' && c.currentHub !== null ? (c.currentHub as any).name : c.currentHub} | Status: ${c.status} | Rating: ⭐${c.ratingAverage} | Features: ${c.features.join(', ')}`
       )
       .join('\n');
 
@@ -213,24 +232,22 @@ OFFICIAL RENTAL POLICIES:
 - Chauffeur / Driver: Available for $25/day with professional verified drivers.
 - Self-Drive Requirements: Valid driving license and national ID/passport.
 
-INSTRUCTIONS:
-1. Respond in the customer's language (${lang === 'banglish' ? 'Banglish (Bengali written in English letters, e.g. "Apnake Best Care-e shagotom...")' : lang === 'bangla' ? 'Standard Bengali script' : 'Polite, professional English'}).
-2. Always recommend 1 to 3 specific vehicles from the verified fleet above that best fit their query (mention daily price $X/day, seats, fuel, hub location).
-3. If they ask about mountains/Sajek/Sylhet: Recommend 4WD SUV like Toyota Prado TX ($145/day) or Hyundai Tucson AWD ($75/day).
-4. If they ask about luxury/VIP/business: Recommend Mercedes-Benz E-Class ($160/day), BMW 530i M Sport ($140/day) or Jaguar XE ($85/day).
-5. If they ask about large family/group: Recommend Toyota HiAce VIP (10 seats, $130/day) or 7-seater Prado.
-6. If they ask about EV/Eco: Recommend Tesla Model Y Long Range ($110/day).
-7. Keep the response organized with neat bullet points and emojis. Be polite, warm, and encourage booking confirmation.`;
+CRITICAL INSTRUCTIONS:
+1. Pay attention to the full conversation history. If the customer already specified a route (e.g. Khulna to Dhaka), retain that context!
+2. If customer asks for recommendation for a specific number of passengers (e.g. "7 joner", "7 people", "family of 7"): ONLY recommend vehicles with AT LEAST that seating capacity (e.g., Toyota Land Cruiser Prado TX with 7 seats, or Toyota HiAce with 11 seats). Clearly state the seat capacity and why it fits!
+3. If customer says "Audi book koro" or asks to book a specific car: Confirm their choice of that exact vehicle (e.g. Audi A6) and politely ask for their preferred pickup date, duration, and pickup hub location to finalize the booking!
+4. Respond in the customer's language (${lang === 'banglish' ? 'Banglish (Bengali written in English letters, e.g. "Apnar 7 joner jattrar jonno amader 7-seater Toyota Land Cruiser Prado TX ($145/day) shobcheye best hobe...")' : lang === 'bangla' ? 'Standard Bengali script' : 'Polite, professional English'}).
+5. Keep responses concise, organized with clean bullet points and emojis. Always encourage booking progress.`;
 
     const fullPrompt = `${systemPrompt}
 
-RECENT CONVERSATION:
-${historyStr}
+RECENT CONVERSATION HISTORY:
+${historyStr || '(No prior turns in this session)'}
 
-CURRENT USER MESSAGE:
+CURRENT CUSTOMER MESSAGE:
 "${query}"
 
-ASSISTANT RESPONSE:`;
+CONCISE ASSISTANT RESPONSE:`;
 
     for (const model of this.geminiModels) {
       try {
@@ -240,11 +257,11 @@ ASSISTANT RESPONSE:`;
           {
             contents: [{ parts: [{ text: fullPrompt }] }],
             generationConfig: {
-              temperature: 0.3,
-              maxOutputTokens: 1000
+              temperature: 0.2,
+              maxOutputTokens: 800
             }
           },
-          { timeout: 9000 }
+          { timeout: 15000 }
         );
 
         const candidate = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -267,7 +284,38 @@ ASSISTANT RESPONSE:`;
   ): string {
     const q = query.toLowerCase();
 
-    // 1. Mountain / Off-road
+    // 1. Specific Booking Intent
+    if (q.includes('book') || q.includes('reserve') || q.includes('rent')) {
+      const targetCar = matchedCars[0] || { name: 'Vehicle', dailyRate: 95, category: 'Luxury' };
+      if (lang === 'banglish') {
+        return `✨ **${targetCar.name}** select kora hoyeche!\n\n• **Daily Rate:** $${targetCar.dailyRate}/day\n• **Category:** ${targetCar.category}\n\nApni kon tarikh theke kon tarikh porjonto ebong kon location theke gari ti pickup korte chan janaben ki? Amra apnar booking confirm kore dicchi!`;
+      } else if (lang === 'bangla') {
+        return `✨ **${targetCar.name}** নির্বাচন করা হয়েছে!\n\n• **ভাড়া:** $${targetCar.dailyRate}/দিন\n• **ক্যাটাগরি:** ${targetCar.category}\n\nআপনি কোন তারিখ থেকে গাড়িটি পিকআপ করতে চান জানালে বুকিং নিশ্চিত করে দেওয়া হবে।`;
+      }
+      return `✨ **${targetCar.name}** selected for booking!\n\n• **Daily Rate:** $${targetCar.dailyRate}/day\n• **Category:** ${targetCar.category}\n\nPlease let us know your preferred pickup date, return date, and pickup location to finalize your reservation.`;
+    }
+
+    // 2. Passenger / Group Capacity (e.g. 7 joner, 7 seat, family)
+    const seatMatch = q.match(/(\d+)\s*(?:jon|joner|seat|seater|passenger|person)/);
+    if (seatMatch || q.includes('7 jon') || q.includes('7 joner') || q.includes('family') || q.includes('group')) {
+      const passengerCount = seatMatch ? parseInt(seatMatch[1], 10) : 7;
+      const largeCars = matchedCars.filter((c) => c.seats >= passengerCount);
+      const chosenList = largeCars.length > 0 ? largeCars : matchedCars;
+
+      if (lang === 'banglish') {
+        const listStr = chosenList.slice(0, 2).map((c, i) =>
+          `🚗 **${i + 1}. ${c.name} (${c.category})**\n• **Rate:** $${c.dailyRate}/day | **Seats:** ${c.seats} Persons\n• **Specs:** ${c.transmission} (${c.fuelType}) | ⭐ ${c.ratingAverage}/5.0`
+        ).join('\n\n');
+        return `Assalamu Alaikum ${userName}! Apnar **${passengerCount} joner** jattrar jonno amader best recommendations:\n\n${listStr}\n\n${chosenList[0]?.name || 'Toyota Prado'} apnader 7 joner shonge luggage soho aramdayok travel-er jonno perfect hobe! Apni ki eiti book korte chan?`;
+      }
+
+      const listStr = chosenList.slice(0, 2).map((c, i) =>
+        `🚗 **${i + 1}. ${c.name} (${c.category})**\n• **Rate:** $${c.dailyRate}/day | **Seats:** ${c.seats} Passengers\n• **Specs:** ${c.transmission} (${c.fuelType}) | ⭐ ${c.ratingAverage}/5.0`
+      ).join('\n\n');
+      return `Hello ${userName}! For a group of **${passengerCount} passengers**, here are our top recommended spacious vehicles:\n\n${listStr}\n\nWould you like to reserve one of these for your journey?`;
+    }
+
+    // 3. Mountain / Off-road
     if (q.includes('sajek') || q.includes('sylhet') || q.includes('pahad') || q.includes('mountain') || q.includes('hill')) {
       if (lang === 'banglish') {
         return `Assalamu Alaikum ${userName}! Sajek ba Sylhet pahari rastar jonno amader 4x4 AWD SUVs perfect:\n\n🚗 **1. Toyota Land Cruiser Prado TX (4WD SUV)**\n• **Rate:** $145/day | **Deposit:** $350\n• **Specs:** 7 Seats, 5 Suitcases, Diff Lock & Terrain Control | ⭐ 4.9\n\n🚗 **2. Hyundai Tucson Limited (AWD SUV)**\n• **Rate:** $75/day | **Deposit:** $200\n• **Specs:** 5 Seats, 4 Suitcases, HTRAC All-Wheel Drive | ⭐ 4.7\n\nUnlimited mileage included for 3+ days. Driver service available for $25/day!`;
@@ -275,7 +323,7 @@ ASSISTANT RESPONSE:`;
       return `For mountain terrains like Sajek or Sylhet, we strongly recommend our 4WD SUVs:\n\n🚗 **1. Toyota Land Cruiser Prado TX (4WD SUV)** — $145/day (7 Seats, Diff Lock, 4x4)\n🚗 **2. Hyundai Tucson Limited (AWD SUV)** — $75/day (5 Seats, HTRAC All-Wheel Drive)\n\nBoth vehicles feature dual AC and comprehensive all-terrain safety.`;
     }
 
-    // 2. Deposit & Refund Policies
+    // 4. Deposit & Refund Policies
     if (q.includes('deposit') || q.includes('refund') || q.includes('taka') || q.includes('policy') || q.includes('cancel')) {
       if (lang === 'banglish') {
         return `Best Care Car Rental-er policy summary:\n\n💳 **Security Deposit:**\n• Standard/Sedan: $200 - $300\n• Luxury/SUV: $350 - $450\n• Gari return korar 24-48 ghontar moddhe deposit 100% refund hoye jay.\n\n🔄 **Cancellation:**\n• Pickup shomoyer 24 ghonta age cancel korle 100% full refund paben.\n\n🛣️ **Mileage:** 3 diner beshi rent korle Unlimited mileage free!`;
@@ -283,7 +331,7 @@ ASSISTANT RESPONSE:`;
       return `Best Care Rental & Deposit Policy:\n\n💳 **Security Deposit:** $200 - $450 depending on vehicle category. 100% refunded within 24-48 hours after vehicle inspection.\n🔄 **Cancellation:** 100% full refund for cancellations made >24 hours prior to scheduled pickup.\n🛣️ **Mileage:** Unlimited mileage on bookings of 3 or more days.`;
     }
 
-    // 3. Specific or general cars list
+    // 5. Specific or general cars list
     const topCars = matchedCars.slice(0, 3);
     if (topCars.length > 0) {
       if (lang === 'banglish') {
@@ -329,18 +377,54 @@ ASSISTANT RESPONSE:`;
       if (filtered.length > 0) return filtered;
     }
 
-    // Category keywords
-    if (q.includes('suv') || q.includes('prado') || q.includes('tucson') || q.includes('sajek') || q.includes('sylhet')) {
+    // 1. Check passenger seat requirement (e.g. 7 joner, 7 seat, 10 seat, 6 person)
+    const seatMatch = q.match(/(\d+)\s*(?:jon|joner|seat|seater|passenger|person)/);
+    if (seatMatch) {
+      const requiredSeats = parseInt(seatMatch[1], 10);
+      const largeCars = allCars.filter((c) => c.seats >= requiredSeats);
+      if (largeCars.length > 0) return largeCars;
+    }
+
+    // 2. Specific brand / model keywords
+    if (q.includes('audi')) {
+      const audiCars = allCars.filter((c) => c.brand.toLowerCase().includes('audi') || c.name.toLowerCase().includes('audi'));
+      if (audiCars.length > 0) return audiCars;
+    }
+    if (q.includes('prado')) {
+      const pradoCars = allCars.filter((c) => c.name.toLowerCase().includes('prado'));
+      if (pradoCars.length > 0) return pradoCars;
+    }
+    if (q.includes('tucson')) {
+      const tucsonCars = allCars.filter((c) => c.name.toLowerCase().includes('tucson'));
+      if (tucsonCars.length > 0) return tucsonCars;
+    }
+    if (q.includes('mercedes') || q.includes('benz')) {
+      const benzCars = allCars.filter((c) => c.brand.toLowerCase().includes('mercedes') || c.name.toLowerCase().includes('mercedes'));
+      if (benzCars.length > 0) return benzCars;
+    }
+    if (q.includes('bmw')) {
+      const bmwCars = allCars.filter((c) => c.brand.toLowerCase().includes('bmw') || c.name.toLowerCase().includes('bmw'));
+      if (bmwCars.length > 0) return bmwCars;
+    }
+    if (q.includes('jaguar')) {
+      const jagCars = allCars.filter((c) => c.brand.toLowerCase().includes('jaguar') || c.name.toLowerCase().includes('jaguar'));
+      if (jagCars.length > 0) return jagCars;
+    }
+    if (q.includes('hiace') || q.includes('micro') || q.includes('van')) {
+      const vanCars = allCars.filter((c) => c.category.toLowerCase() === 'passenger van' || c.seats >= 7);
+      if (vanCars.length > 0) return vanCars;
+    }
+    if (q.includes('tesla') || q.includes('ev') || q.includes('electric')) {
+      const evCars = allCars.filter((c) => c.category.toLowerCase() === 'electric');
+      if (evCars.length > 0) return evCars;
+    }
+
+    // 3. Category keywords
+    if (q.includes('suv') || q.includes('sajek') || q.includes('sylhet')) {
       return allCars.filter((c) => c.category.toLowerCase() === 'suv');
     }
-    if (q.includes('luxury') || q.includes('vip') || q.includes('mercedes') || q.includes('bmw') || q.includes('audi') || q.includes('jaguar')) {
+    if (q.includes('luxury') || q.includes('vip')) {
       return allCars.filter((c) => c.category.toLowerCase() === 'luxury' || c.category.toLowerCase() === 'sedan');
-    }
-    if (q.includes('electric') || q.includes('tesla') || q.includes('ev')) {
-      return allCars.filter((c) => c.category.toLowerCase() === 'electric');
-    }
-    if (q.includes('van') || q.includes('hiace') || q.includes('micro') || q.includes('10 seat') || q.includes('family')) {
-      return allCars.filter((c) => c.category.toLowerCase() === 'passenger van' || c.seats >= 7);
     }
     if (q.includes('sports') || q.includes('mustang') || q.includes('convertible') || q.includes('v8')) {
       return allCars.filter((c) => c.category.toLowerCase() === 'sports');
@@ -360,7 +444,8 @@ ASSISTANT RESPONSE:`;
 
     const banglishWords = [
       'ami', 'korte', 'chai', 'gari', 'bhara', 'koto', 'lagbe', 'ache', 'ki', 'apnader',
-      'bhalo', 'shagotom', 'dorkar', 'kobe', 'pabo', 'kothay', 'sajek', 'chole', 'jabo'
+      'bhalo', 'shagotom', 'dorkar', 'kobe', 'pabo', 'kothay', 'sajek', 'chole', 'jabo',
+      'konta', 'joner', 'jonno', 'koro', 'korbo', 'thik', 'hobe', 'kalke', 'tarikh', 'dekhao', 'chao'
     ];
     const qLower = query.toLowerCase();
     const isBanglish = banglishWords.some((w) => qLower.includes(w));
@@ -377,6 +462,7 @@ ASSISTANT RESPONSE:`;
     if (q.includes('price') || q.includes('rate') || q.includes('koto') || q.includes('cost')) return 'price_inquiry';
     if (q.includes('sajek') || q.includes('sylhet') || q.includes('mountain') || q.includes('trip')) return 'trip_recommendation';
     if (q.includes('deposit') || q.includes('refund') || q.includes('policy')) return 'policy_inquiry';
+    if (q.includes('jon') || q.includes('joner') || q.includes('seat') || q.includes('passenger') || q.includes('family')) return 'car_recommendation';
     return 'general_faq';
   }
 
